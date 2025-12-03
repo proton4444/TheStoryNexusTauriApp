@@ -1,6 +1,9 @@
+import importlib
+import os
 from fastapi.testclient import TestClient
 import pytest
 
+from sidecar import memori_bridge
 from sidecar.memori_bridge import app, get_backend
 
 
@@ -93,3 +96,27 @@ def test_clear_memory_removes_story_memories():
     )
     assert search_resp.status_code == 200
     assert search_resp.json()["results"] == []
+
+
+def test_memori_backend_stub_embeddings(monkeypatch, tmp_path):
+    pytest.importorskip("memori")
+    monkeypatch.setenv("MEMORI_SIDECAR_BACKEND", "memori")
+    monkeypatch.setenv("MEMORI_SIDECAR_MEMORI_DB_PATH", str(tmp_path / "memori.db"))
+    monkeypatch.setenv("MEMORI_SIDECAR_STUB_EMBEDDINGS", "1")
+    module = importlib.reload(memori_bridge)
+    client = TestClient(module.app)
+
+    add_resp = client.post(
+        "/memory/add",
+        json={"story_id": "story-xyz", "content": "Castle on the hill"},
+    )
+    assert add_resp.status_code == 200
+
+    search_resp = client.post(
+        "/search",
+        json={"story_id": "story-xyz", "query": "Castle", "limit": 5},
+    )
+    assert search_resp.status_code == 200
+    results = search_resp.json()["results"]
+    assert len(results) == 1
+    assert results[0]["content"] == "Castle on the hill"

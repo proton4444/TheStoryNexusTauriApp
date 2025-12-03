@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
     local_api_url: str = Field(default="http://127.0.0.1:1234/v1")
+    stub_embeddings: bool = Field(default=False)
 
     class Config:
         env_prefix = "MEMORI_SIDECAR_"

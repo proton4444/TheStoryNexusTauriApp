@@ -61,6 +61,7 @@ Env vars:
 - `MEMORI_SIDECAR_LLM_PROVIDER=stub|openai|openrouter|local`
 - `MEMORI_SIDECAR_LLM_MODEL=gpt-4o-mini`
 - `MEMORI_SIDECAR_OPENAI_API_KEY`, `MEMORI_SIDECAR_OPENROUTER_API_KEY`
+- `MEMORI_SIDECAR_STUB_EMBEDDINGS=1` (use lightweight embeddings/search for offline tests)
 
 ### Building
 

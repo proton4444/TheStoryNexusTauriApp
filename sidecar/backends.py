@@ -107,7 +107,11 @@ class MemoriBackend(MemoryBackend):
             else:
                 raise RuntimeError(f"Memori backend unavailable: {exc}") from exc
 
-        self._embed_texts = embed_texts
+        self.use_stub_embeddings = settings.stub_embeddings
+        if self.use_stub_embeddings:
+            self._embed_texts = lambda texts: [[0.0] * 384 for _ in texts]  # type: ignore
+        else:
+            self._embed_texts = embed_texts
         self._recall_cls = Recall
         self.process_external_id = settings.process_id
 
@@ -151,6 +155,34 @@ class MemoriBackend(MemoryBackend):
 
     def search(self, story_id: str, query: str, limit: int) -> List[MemoryEntry]:
         entity_id, _process_id = self._ensure_entity_and_process(story_id)
+        if self.use_stub_embeddings:
+            adapter = self.memori.config.storage.adapter
+            rows = (
+                adapter.execute(
+                    """
+                    SELECT uuid, content
+                      FROM memori_entity_fact
+                     WHERE entity_id = ?
+                       AND content LIKE ?
+                     ORDER BY date_last_time DESC
+                     LIMIT ?
+                    """,
+                    (entity_id, f"%{query}%", limit),
+                )
+                .mappings()
+                .fetchall()
+            )
+            return [
+                MemoryEntry(
+                    memory_id=row.get("uuid") or str(uuid.uuid4()),
+                    story_id=story_id,
+                    content=row.get("content", ""),
+                    category=None,
+                    session_id=None,
+                )
+                for row in rows
+            ]
+
         recall_results = self._recall_cls(self.memori.config).search_facts(
             query, limit=limit, entity_id=entity_id
         )
@@ -168,7 +200,34 @@ class MemoriBackend(MemoryBackend):
         return entries[:limit]
 
     def recent(self, story_id: str, limit: int) -> List[MemoryEntry]:
-        # Memori doesn't have a direct "recent facts" helper; reuse search with empty query.
+        entity_id, _process_id = self._ensure_entity_and_process(story_id)
+        if self.use_stub_embeddings:
+            adapter = self.memori.config.storage.adapter
+            rows = (
+                adapter.execute(
+                    """
+                    SELECT uuid, content
+                      FROM memori_entity_fact
+                     WHERE entity_id = ?
+                     ORDER BY date_last_time DESC
+                     LIMIT ?
+                    """,
+                    (entity_id, limit),
+                )
+                .mappings()
+                .fetchall()
+            )
+            return [
+                MemoryEntry(
+                    memory_id=row.get("uuid") or str(uuid.uuid4()),
+                    story_id=story_id,
+                    content=row.get("content", ""),
+                    category=None,
+                    session_id=None,
+                )
+                for row in rows
+            ]
+
         return self.search(story_id, query="", limit=limit)
 
     def clear_story(self, story_id: str) -> int:
