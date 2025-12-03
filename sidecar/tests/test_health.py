@@ -63,8 +63,11 @@ def test_context_returns_most_recent_first():
     assert memories[0]["content"] == "Recent fact"
 
 
-def test_completion_injects_recent_memories_and_sets_session():
-    client = TestClient(app)
+def test_completion_injects_recent_memories_and_sets_session(monkeypatch):
+    # Force stub LLM for deterministic output
+    monkeypatch.setenv("MEMORI_SIDECAR_LLM_PROVIDER", "stub")
+    module = importlib.reload(memori_bridge)
+    client = TestClient(module.app)
     client.post("/memory/add", json={"story_id": "story-1", "content": "Memory A"})
     client.post("/memory/add", json={"story_id": "story-1", "content": "Memory B"})
 
@@ -103,6 +106,7 @@ def test_memori_backend_stub_embeddings(monkeypatch, tmp_path):
     monkeypatch.setenv("MEMORI_SIDECAR_BACKEND", "memori")
     monkeypatch.setenv("MEMORI_SIDECAR_MEMORI_DB_PATH", str(tmp_path / "memori.db"))
     monkeypatch.setenv("MEMORI_SIDECAR_STUB_EMBEDDINGS", "1")
+    monkeypatch.setenv("MEMORI_SIDECAR_LLM_PROVIDER", "stub")
     module = importlib.reload(memori_bridge)
     client = TestClient(module.app)
 

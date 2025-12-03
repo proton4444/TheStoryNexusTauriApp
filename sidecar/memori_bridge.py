@@ -4,11 +4,12 @@ import logging
 import uuid
 from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from sidecar.backends import MemoryEntry, select_backend
 from sidecar.settings import Settings
+from sidecar.llm import CompletionClient, LlmConfig
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,17 @@ app.state.backend = backend
 
 def get_backend():
     return app.state.backend
+
+
+def get_llm_client() -> CompletionClient:
+    cfg = LlmConfig(
+        provider=settings.llm_provider,
+        model=settings.llm_model,
+        openai_api_key=settings.openai_api_key,
+        openrouter_api_key=settings.openrouter_api_key,
+        local_api_url=settings.local_api_url,
+    )
+    return CompletionClient(cfg)
 
 
 class CompletionRequest(BaseModel):
@@ -167,9 +179,12 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
         )
     ]
     # Placeholder completion text until Memori + LLM wiring lands.
-    completion_text = (
-        f"[stub] completion for story '{payload.story_id}' with prompt: {payload.prompt}"
-    )
+    llm_client = get_llm_client()
+    try:
+        completion_text = await llm_client.complete(payload.prompt)
+    except Exception as exc:  # pragma: no cover - runtime failure path
+        logger.error("LLM completion failed: %s", exc)
+        raise HTTPException(status_code=500, detail="LLM completion failed") from exc
     return CompletionResponse(
         completion=completion_text,
         story_id=payload.story_id,
