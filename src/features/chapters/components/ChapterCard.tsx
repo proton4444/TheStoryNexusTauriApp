@@ -77,6 +77,7 @@ export function ChapterCard({ chapter, storyId }: ChapterCardProps) {
     return stored ? JSON.parse(stored) : false;
   });
   const [summary, setSummary] = useState(chapter.summary || "");
+  const [useMemoryFlow, setUseMemoryFlow] = useState(true);
   const deleteChapter = useChapterStore((state) => state.deleteChapter);
   const updateChapter = useChapterStore((state) => state.updateChapter);
   const updateChapterSummaryOptimistic = useChapterStore(
@@ -219,6 +220,18 @@ export function ChapterCard({ chapter, storyId }: ChapterCardProps) {
         },
       };
 
+      if (useMemoryFlow) {
+        const memoriResult = await generateWithMemoryPrompt(config, storyId);
+        if (memoriResult) {
+          const text = memoriResult.completion;
+          setSummary(text);
+          await updateChapterSummaryOptimistic(chapter.id, text);
+          toast.success("Summary generated successfully");
+          setIsGenerating(false);
+          return;
+        }
+      }
+
       const response = await generateWithPrompt(config, model);
       let text = "";
 
@@ -272,23 +285,33 @@ export function ChapterCard({ chapter, storyId }: ChapterCardProps) {
               className="min-h-[100px] overflow-hidden"
             />
             <div className="flex justify-between items-center">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleSaveSummary}
-              >
-                Save Summary
-              </Button>
-              <AIGenerateMenu
-                isGenerating={isGenerating}
-                isLoading={isLoading}
-                error={error}
-                prompts={prompts}
-                promptType="gen_summary"
-                buttonText="Generate Summary"
-                onGenerate={handleGenerateSummary}
-              />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Switch
+                  checked={useMemoryFlow}
+                  onCheckedChange={setUseMemoryFlow}
+                  aria-label="Use memory sidecar"
+                />
+                <span>Use memory sidecar</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSaveSummary}
+                >
+                  Save Summary
+                </Button>
+                <AIGenerateMenu
+                  isGenerating={isGenerating}
+                  isLoading={isLoading}
+                  error={error}
+                  prompts={prompts}
+                  promptType="gen_summary"
+                  buttonText="Generate Summary"
+                  onGenerate={handleGenerateSummary}
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t">
               <DownloadMenu type="chapter" id={chapter.id} />
