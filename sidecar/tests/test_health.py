@@ -1,15 +1,15 @@
 from fastapi.testclient import TestClient
 import pytest
 
-from sidecar.memori_bridge import app, get_store
+from sidecar.memori_bridge import app, get_backend
 
 
 @pytest.fixture(autouse=True)
-def reset_store():
-    store = get_store()
-    store.clear_all()
+def reset_backend():
+    backend = get_backend()
+    backend.clear_all()
     yield
-    store.clear_all()
+    backend.clear_all()
 
 
 def test_health_ok():

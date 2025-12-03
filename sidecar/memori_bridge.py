@@ -1,78 +1,35 @@
 from __future__ import annotations
 
+import logging
 import uuid
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-# Minimal FastAPI app; endpoints will be wired to Memori engine in future iterations.
+from sidecar.backends import MemoryEntry, select_backend
+from sidecar.settings import Settings
+
+logger = logging.getLogger(__name__)
+
+# Minimal FastAPI app; endpoints are wired to a pluggable backend (stub or Memori).
 app = FastAPI(
     title="Memori Sidecar",
-    version="0.2.0",
+    version="0.3.0",
     description="FastAPI wrapper around Memori for StoryNexus integration.",
 )
+settings = Settings()
+backend = select_backend(settings)
+app.state.backend = backend
 
 
-@dataclass
-class MemoryEntry:
-    memory_id: str
-    story_id: str
-    content: str
-    category: Optional[str] = None
-    session_id: Optional[str] = None
-
-
-class MemoryStore:
-    """In-memory placeholder store; will be replaced by Memori-backed storage."""
-
-    def __init__(self) -> None:
-        self._memories: Dict[str, List[MemoryEntry]] = {}
-
-    def add(
-        self,
-        story_id: str,
-        content: str,
-        category: Optional[str] = None,
-        session_id: Optional[str] = None,
-    ) -> MemoryEntry:
-        memory_id = str(uuid.uuid4())
-        entry = MemoryEntry(
-            memory_id=memory_id,
-            story_id=story_id,
-            content=content,
-            category=category,
-            session_id=session_id,
-        )
-        self._memories.setdefault(story_id, []).append(entry)
-        return entry
-
-    def search(self, story_id: str, query: str, limit: int) -> List[MemoryEntry]:
-        items = self._memories.get(story_id, [])
-        q_lower = query.lower()
-        results = [entry for entry in items if q_lower in entry.content.lower()]
-        return results[:limit]
-
-    def recent(self, story_id: str, limit: int) -> List[MemoryEntry]:
-        items = self._memories.get(story_id, [])
-        if limit <= 0:
-            return []
-        # Return newest-first
-        return list(reversed(items))[:limit]
-
-    def clear_story(self, story_id: str) -> int:
-        removed = len(self._memories.get(story_id, []))
-        self._memories.pop(story_id, None)
-        return removed
-
-    def clear_all(self) -> None:
-        self._memories.clear()
+def get_backend():
+    return app.state.backend
 
 
 class CompletionRequest(BaseModel):
     prompt: str = Field(..., min_length=1)
-    story_id: str
+    story_id: str = Field(..., min_length=1)
     session_id: Optional[str] = None
     inject_limit: int = Field(default=3, ge=0, le=50)
     model: Optional[str] = None
@@ -87,7 +44,7 @@ class CompletionResponse(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    story_id: str
+    story_id: str = Field(..., min_length=1)
     query: str
     limit: int = Field(default=10, ge=1, le=50)
 
@@ -104,7 +61,7 @@ class SearchResponse(BaseModel):
 
 
 class ContextRequest(BaseModel):
-    story_id: str
+    story_id: str = Field(..., min_length=1)
     limit: int = Field(default=5, ge=0, le=50)
 
 
@@ -113,7 +70,7 @@ class ContextResponse(BaseModel):
 
 
 class SessionNewRequest(BaseModel):
-    story_id: str
+    story_id: str = Field(..., min_length=1)
 
 
 class SessionNewResponse(BaseModel):
@@ -122,7 +79,7 @@ class SessionNewResponse(BaseModel):
 
 
 class MemoryAddRequest(BaseModel):
-    story_id: str
+    story_id: str = Field(..., min_length=1)
     content: str = Field(..., min_length=1)
     category: Optional[str] = None
     session_id: Optional[str] = None
@@ -131,14 +88,6 @@ class MemoryAddRequest(BaseModel):
 class MemoryAddResponse(BaseModel):
     memory_id: str
     story_id: str
-
-
-store = MemoryStore()
-app.state.memory_store = store
-
-
-def get_store() -> MemoryStore:
-    return app.state.memory_store
 
 
 @app.get("/health", tags=["system"])
@@ -155,7 +104,7 @@ async def session_new(payload: SessionNewRequest) -> SessionNewResponse:
 
 @app.post("/memory/add", tags=["memory"], response_model=MemoryAddResponse)
 async def memory_add(payload: MemoryAddRequest) -> MemoryAddResponse:
-    entry = get_store().add(
+    entry = get_backend().add_memory(
         story_id=payload.story_id,
         content=payload.content,
         category=payload.category,
@@ -166,13 +115,13 @@ async def memory_add(payload: MemoryAddRequest) -> MemoryAddResponse:
 
 @app.delete("/memory/{story_id}", tags=["memory"])
 async def clear_memory(story_id: str) -> dict[str, int | str]:
-    cleared = get_store().clear_story(story_id)
+    cleared = get_backend().clear_story(story_id)
     return {"story_id": story_id, "cleared": cleared}
 
 
 @app.post("/search", tags=["memory"], response_model=SearchResponse)
 async def search(payload: SearchRequest) -> SearchResponse:
-    results = get_store().search(
+    results = get_backend().search(
         story_id=payload.story_id, query=payload.query, limit=payload.limit
     )
     return SearchResponse(
@@ -190,7 +139,7 @@ async def search(payload: SearchRequest) -> SearchResponse:
 
 @app.post("/context", tags=["memory"], response_model=ContextResponse)
 async def context(payload: ContextRequest) -> ContextResponse:
-    memories = get_store().recent(story_id=payload.story_id, limit=payload.limit)
+    memories = get_backend().recent(story_id=payload.story_id, limit=payload.limit)
     return ContextResponse(
         memories=[
             MemoryResult(
@@ -209,7 +158,7 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
     session_id = payload.session_id or str(uuid.uuid4())
     injected = [
         entry.content
-        for entry in get_store().recent(
+        for entry in get_backend().recent(
             story_id=payload.story_id, limit=payload.inject_limit
         )
     ]
