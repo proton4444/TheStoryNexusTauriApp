@@ -115,6 +115,11 @@ class MemoriBackend(MemoryBackend):
             return sqlite3.connect(settings.memori_db_path)
 
         self.memori = Memori(conn=conn_factory)
+        # Apply LLM-related settings for future completion wiring.
+        self.memori.config.llm.provider = settings.llm_provider
+        self.memori.config.llm.version = settings.llm_model
+        if settings.openai_api_key:
+            self.memori.config.api_key = settings.openai_api_key
         # Build schema (no banner)
         builder = Builder(self.memori.config)
         builder.display_banner = False

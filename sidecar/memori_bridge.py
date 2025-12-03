@@ -41,6 +41,8 @@ class CompletionResponse(BaseModel):
     story_id: str
     session_id: str
     injected_memories: List[str]
+    llm_provider: str | None = None
+    llm_model: str | None = None
 
 
 class SearchRequest(BaseModel):
@@ -156,6 +158,8 @@ async def context(payload: ContextRequest) -> ContextResponse:
 @app.post("/completion", tags=["memory"], response_model=CompletionResponse)
 async def completion(payload: CompletionRequest) -> CompletionResponse:
     session_id = payload.session_id or str(uuid.uuid4())
+    chosen_model = payload.model or settings.llm_model
+    chosen_provider = settings.llm_provider
     injected = [
         entry.content
         for entry in get_backend().recent(
@@ -171,4 +175,6 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
         story_id=payload.story_id,
         session_id=session_id,
         injected_memories=injected,
+        llm_provider=chosen_provider,
+        llm_model=chosen_model,
     )
