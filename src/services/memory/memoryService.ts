@@ -1,0 +1,122 @@
+import { invoke } from '@tauri-apps/api/core';
+
+type HealthResponse = string;
+
+export type CompletionRequest = {
+  storyId: string;
+  prompt: string;
+  sessionId?: string;
+  injectLimit?: number;
+};
+
+export type CompletionResponse = {
+  completion: string;
+  story_id: string;
+  session_id: string;
+  injected_memories: string[];
+};
+
+export type MemoryAddRequest = {
+  storyId: string;
+  content: string;
+  category?: string;
+  sessionId?: string;
+};
+
+export type MemorySearchRequest = {
+  storyId: string;
+  query: string;
+  limit?: number;
+};
+
+export type MemoryResult = {
+  memory_id: string;
+  content: string;
+  category?: string;
+  session_id?: string;
+};
+
+export type MemoryContextRequest = {
+  storyId: string;
+  limit?: number;
+};
+
+const DEFAULT_PORT = 9876;
+
+export async function startSidecar(opts?: { pythonBin?: string; port?: number }) {
+  await invoke('start_memori_sidecar', {
+    pythonBin: opts?.pythonBin,
+    port: opts?.port ?? DEFAULT_PORT,
+  });
+}
+
+export async function stopSidecar() {
+  await invoke('stop_memori_sidecar');
+}
+
+export async function health(port: number = DEFAULT_PORT): Promise<HealthResponse> {
+  return invoke('memori_health', { port });
+}
+
+async function postJSON<T>(path: string, body: Record<string, unknown>, port = DEFAULT_PORT): Promise<T> {
+  const url = `http://127.0.0.1:${port}${path}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    throw new Error(`Request failed: ${resp.status} ${resp.statusText}`);
+  }
+  return resp.json() as Promise<T>;
+}
+
+export async function createSession(storyId: string, port = DEFAULT_PORT) {
+  return postJSON<{ story_id: string; session_id: string }>(
+    '/session/new',
+    { story_id: storyId },
+    port,
+  );
+}
+
+export async function addMemory(req: MemoryAddRequest, port = DEFAULT_PORT) {
+  return postJSON<{ memory_id: string; story_id: string }>(
+    '/memory/add',
+    {
+      story_id: req.storyId,
+      content: req.content,
+      category: req.category,
+      session_id: req.sessionId,
+    },
+    port,
+  );
+}
+
+export async function searchMemories(req: MemorySearchRequest, port = DEFAULT_PORT) {
+  return postJSON<{ results: MemoryResult[] }>(
+    '/search',
+    { story_id: req.storyId, query: req.query, limit: req.limit ?? 10 },
+    port,
+  );
+}
+
+export async function getContext(req: MemoryContextRequest, port = DEFAULT_PORT) {
+  return postJSON<{ memories: MemoryResult[] }>(
+    '/context',
+    { story_id: req.storyId, limit: req.limit ?? 5 },
+    port,
+  );
+}
+
+export async function completeWithMemory(req: CompletionRequest, port = DEFAULT_PORT) {
+  return postJSON<CompletionResponse>(
+    '/completion',
+    {
+      story_id: req.storyId,
+      prompt: req.prompt,
+      session_id: req.sessionId,
+      inject_limit: req.injectLimit ?? 3,
+    },
+    port,
+  );
+}

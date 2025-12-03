@@ -40,6 +40,24 @@ The Story Nexus is a local-first desktop application designed for writers who wa
    ```
    npm run dev
    ```
+4. (Optional) Run Tauri dev (desktop shell):
+   ```
+   npm run tauri dev
+   ```
+
+### Sidecar (Memori) development
+In a separate terminal:
+```bash
+cd sidecar
+python -m venv .venv
+. .venv/Scripts/activate  # or source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn sidecar.memori_bridge:app --reload --port 9876
+```
+Env vars:
+- `MEMORI_SIDECAR_BACKEND=stub|memori` (default `stub`)
+- `MEMORI_SIDECAR_MEMORI_DB_PATH=memori.db` (SQLite path)
+- `MEMORI_SIDECAR_PROCESS_ID=storynexus` (process attribution)
 
 ### Building
 
