@@ -110,6 +110,19 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/config", tags=["system"])
+async def config_snapshot() -> dict[str, str | int | None]:
+    """Return a minimal snapshot of configured backend/LLM settings (redacted keys)."""
+    return {
+        "backend": settings.backend,
+        "host": settings.host,
+        "port": settings.port,
+        "process_id": settings.process_id,
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.llm_model,
+    }
+
+
 @app.post("/session/new", tags=["session"], response_model=SessionNewResponse)
 async def session_new(payload: SessionNewRequest) -> SessionNewResponse:
     session_id = str(uuid.uuid4())

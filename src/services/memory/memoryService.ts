@@ -58,6 +58,22 @@ export async function health(port: number = DEFAULT_PORT): Promise<HealthRespons
   return invoke('memori_health', { port });
 }
 
+export async function config(port: number = DEFAULT_PORT) {
+  const url = `http://127.0.0.1:${port}/config`;
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    throw new Error(`Config request failed: ${resp.status} ${resp.statusText}`);
+  }
+  return resp.json() as Promise<{
+    backend: string;
+    host: string;
+    port: number;
+    process_id: string;
+    llm_provider: string;
+    llm_model: string;
+  }>;
+}
+
 async function postJSON<T>(path: string, body: Record<string, unknown>, port = DEFAULT_PORT): Promise<T> {
   const url = `http://127.0.0.1:${port}${path}`;
   const resp = await fetch(url, {

@@ -124,3 +124,12 @@ def test_memori_backend_stub_embeddings(monkeypatch, tmp_path):
     results = search_resp.json()["results"]
     assert len(results) == 1
     assert results[0]["content"] == "Castle on the hill"
+
+
+def test_config_snapshot():
+    client = TestClient(app)
+    resp = client.get("/config")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "backend" in body
+    assert "llm_provider" in body
