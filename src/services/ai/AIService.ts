@@ -1,6 +1,7 @@
 import { AIModel, AIProvider, AISettings, PromptMessage } from '@/types/story';
 import { db } from '../database';
 import OpenAI from 'openai';
+import { startSidecar, completeWithMemory as memoriComplete, CompletionResponse as MemoriCompletionResponse } from '../memory/memoryService';
 
 export class AIService {
     private static instance: AIService;
@@ -23,6 +24,28 @@ export class AIService {
         // Load or create settings
         const settings = await db.aiSettings.toArray();
         this.settings = settings[0] || await this.createInitialSettings();
+    }
+
+    /**
+     * Memory-aware completion using the sidecar. This is non-streaming and will
+     * return `null` on failure.
+     */
+    async completeWithMemory(prompt: string, storyId: string, opts?: { sessionId?: string; injectLimit?: number; port?: number }): Promise<MemoriCompletionResponse | null> {
+        try {
+            await startSidecar({ port: opts?.port });
+            return await memoriComplete(
+                {
+                    prompt,
+                    storyId,
+                    sessionId: opts?.sessionId,
+                    injectLimit: opts?.injectLimit,
+                },
+                opts?.port,
+            );
+        } catch (error) {
+            console.error('[AIService] Memory completion failed', error);
+            return null;
+        }
     }
 
     private async createInitialSettings(): Promise<AISettings> {
