@@ -10,12 +10,17 @@ import {
 import { aiService } from '@/services/ai/AIService';
 import { db } from '@/services/database';
 import { createPromptParser } from '@/features/prompts/services/promptParser';
+import { memoriCompletionAdapter } from '@/services/ai/memoriCompletionAdapter';
+import { MemoriCompletionResponse } from '@/services/memory/memoryService';
+import { useMemoryCompletion } from '@/hooks/useMemoryCompletion';
 
 interface AIState {
     settings: AISettings | null;
     isInitialized: boolean;
     isLoading: boolean;
     error: string | null;
+    useMemory: boolean;
+    useMemory: boolean;
 
     // Initialize AI service and load settings
     initialize: () => Promise<void>;
@@ -44,6 +49,7 @@ interface AIState {
     ) => Promise<void>;
 
     generateWithPrompt: (config: PromptParserConfig, selectedModel: AllowedModel) => Promise<Response>;
+    generateWithMemoryPrompt: (config: PromptParserConfig, storyId: string) => Promise<MemoriCompletionResponse | null>;
 
     // New method for generating with pre-parsed messages
     generateWithParsedMessages: (
@@ -61,6 +67,7 @@ export const useAIStore = create<AIState>((set, get) => ({
     isInitialized: false,
     isLoading: false,
     error: null,
+    useMemory: false,
 
     initialize: async () => {
         set({ isLoading: true, error: null });
@@ -186,6 +193,19 @@ export const useAIStore = create<AIState>((set, get) => ({
                 );
             default:
                 throw new Error(`Unsupported provider: ${selectedModel.provider}`);
+        }
+    },
+
+    generateWithMemoryPrompt: async (config: PromptParserConfig, storyId: string) => {
+        if (!get().isInitialized) {
+            await get().initialize();
+        }
+
+        try {
+            return await memoriCompletionAdapter(config, storyId);
+        } catch (error) {
+            console.error('[useAIStore] Memory completion failed', error);
+            return null;
         }
     },
 
