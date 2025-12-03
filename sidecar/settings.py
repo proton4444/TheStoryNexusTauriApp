@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(env_prefix="MEMORI_SIDECAR_")
+
     host: str = Field(default="127.0.0.1")
     port: int = Field(default=9876)
     backend: Literal["stub", "memori"] = Field(default="stub")
@@ -22,6 +24,3 @@ class Settings(BaseSettings):
     openrouter_api_key: Optional[str] = None
     local_api_url: str = Field(default="http://127.0.0.1:1234/v1")
     stub_embeddings: bool = Field(default=False)
-
-    class Config:
-        env_prefix = "MEMORI_SIDECAR_"
