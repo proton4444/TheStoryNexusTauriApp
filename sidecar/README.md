@@ -11,6 +11,8 @@ pip install -r requirements.txt
 uvicorn sidecar.memori_bridge:app --reload --port 9876
 ```
 
+> Note: The current implementation is an in-memory stub for endpoint shapes only. It is not persistent or production-ready; wiring to Memori + storage comes next.
+
 ## Testing
 ```bash
 cd sidecar
