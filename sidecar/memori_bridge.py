@@ -178,10 +178,11 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
             story_id=payload.story_id, limit=payload.inject_limit
         )
     ]
-    # Placeholder completion text until Memori + LLM wiring lands.
     llm_client = get_llm_client()
     try:
         completion_text = await llm_client.complete(payload.prompt)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - runtime failure path
         logger.error("LLM completion failed: %s", exc)
         raise HTTPException(status_code=500, detail="LLM completion failed") from exc
