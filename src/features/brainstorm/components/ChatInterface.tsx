@@ -24,15 +24,7 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import parseLorebookJson from "@/features/brainstorm/utils/parseLorebookJson";
 import { CreateEntryDialog } from '@/features/lorebook/components/CreateEntryDialog';
 import { cn } from '@/lib/utils';
-import {
-  LorebookEntry,
-  ChatMessage,
-  Prompt,
-  AllowedModel,
-  PromptParserConfig,
-  PromptMessage,
-  Chapter,
-} from "@/types/story";
+import { LorebookEntry, ChatMessage, Prompt, AllowedModel, PromptParserConfig, PromptMessage, Chapter } from "@/types/story";
 import { createPromptParser } from "@/features/prompts/services/promptParser";
 import {
   Select,
@@ -97,6 +89,7 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
     initialize: initializeAI,
     getAvailableModels,
     generateWithPrompt,
+    generateWithMemoryPrompt,
     processStreamedResponse,
     abortGeneration,
   } = useAIStore();
@@ -158,6 +151,8 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
 
   // State for selected lorebook items
   const [selectedItems, setSelectedItems] = useState<LorebookEntry[]>([]);
+  // Memory-aware generation toggle
+  const [useMemoryFlow, setUseMemoryFlow] = useState(true);
 
   // Initialize
   useEffect(() => {
@@ -233,6 +228,10 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
   // Check if any context is selected
   const anyContextSelected =
     selectedSummaries.length > 0 || selectedItems.length > 0;
+
+  const toggleMemoryFlow = () => {
+    setUseMemoryFlow((prev) => !prev);
+  };
 
   // Toggle full context
   const toggleIncludeFullContext = () => {
@@ -412,6 +411,23 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
       }
 
       const config = createPromptConfig(selectedPrompt);
+      if (useMemoryFlow) {
+        const memoriResult = await generateWithMemoryPrompt(config, storyId);
+        if (memoriResult) {
+          const assistantMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: memoriResult.completion,
+            timestamp: new Date(),
+          };
+          const updatedMessages = [...newMessages, assistantMessage];
+          setMessages(updatedMessages);
+          await updateChat(chatId, { messages: updatedMessages });
+          setIsGenerating(false);
+          return;
+        }
+      }
+
       const response = await generateWithPrompt(config, selectedModel);
 
       if (!response.ok && response.status !== 204) {
@@ -1085,6 +1101,10 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
       {/* Input area */}
       <div className="border-t p-4">
         <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Switch checked={useMemoryFlow} onCheckedChange={toggleMemoryFlow} />
+            <span>Use memory sidecar</span>
+          </div>
           <div className="flex-1">
             <Textarea
               placeholder="Type your message..."
