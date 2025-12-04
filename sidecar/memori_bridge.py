@@ -27,6 +27,17 @@ app = FastAPI(
     description="FastAPI wrapper around Memori for StoryNexus integration.",
     openapi_tags=tags_metadata,
 )
+
+# Add CORS middleware to allow requests from web dev server
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:1420", "http://127.0.0.1:1420", "http://localhost:4173", "http://127.0.0.1:4173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 settings = Settings()
 backend = select_backend(settings)
 app.state.backend = backend

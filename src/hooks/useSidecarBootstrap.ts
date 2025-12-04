@@ -17,17 +17,15 @@ export function useSidecarBootstrap() {
     let cancelled = false;
 
     async function bootstrap() {
-      // Skip if not running inside Tauri (e.g., web build)
-      if (typeof (window as any).__TAURI__ === "undefined") {
-        setStatus({
-          ready: false,
-          message: "Sidecar unavailable in web build",
-        });
-        return;
-      }
+      const isTauri = typeof (window as any).__TAURI__ !== "undefined";
 
       try {
-        await startSidecar();
+        // In Tauri, start the sidecar process
+        if (isTauri) {
+          await startSidecar();
+        }
+
+        // In both web and Tauri, check health via HTTP
         await sidecarHealth();
         const cfg = await fetchConfig();
         if (cancelled) return;
@@ -40,11 +38,16 @@ export function useSidecarBootstrap() {
       } catch (err) {
         console.error("[sidecar] bootstrap failed", err);
         if (cancelled) return;
+        const message = isTauri
+          ? "Sidecar failed to start"
+          : "Sidecar unavailable - start manually with: uvicorn sidecar.memori_bridge:app --port 9876";
         setStatus({
           ready: false,
-          message: "Sidecar failed to start",
+          message,
         });
-        toast.error("Memory sidecar failed to start. Check config and restart.");
+        if (isTauri) {
+          toast.error("Memory sidecar failed to start. Check config and restart.");
+        }
       }
     }
 
@@ -56,3 +59,4 @@ export function useSidecarBootstrap() {
 
   return status;
 }
+

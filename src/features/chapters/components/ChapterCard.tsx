@@ -54,6 +54,7 @@ import { PromptParserConfig } from "@/types/story";
 import { AIGenerateMenu } from "@/components/ui/ai-generate-menu";
 import { useLorebookStore } from "@/features/lorebook/stores/useLorebookStore";
 import { DownloadMenu } from "@/components/ui/DownloadMenu";
+import { Switch } from "@/components/ui/switch";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -93,7 +94,7 @@ export function ChapterCard({ chapter, storyId }: ChapterCardProps) {
   const povType = form.watch("povType");
   const { setCurrentChapterId } = useStoryContext();
   const navigate = useNavigate();
-  const { generateWithPrompt, processStreamedResponse } = useAIStore();
+  const { generateWithPrompt, processStreamedResponse, generateWithMemoryPrompt } = useAIStore();
   const { prompts, isLoading, error } = usePromptStore();
   const [isGenerating, setIsGenerating] = useState(false);
   const getChapterPlainText = useChapterStore(

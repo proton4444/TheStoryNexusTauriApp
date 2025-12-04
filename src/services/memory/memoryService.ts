@@ -83,7 +83,16 @@ export async function stopSidecar() {
 }
 
 export async function health(port: number = DEFAULT_PORT): Promise<HealthResponse> {
-  return invoke('memori_health', { port });
+  if (isTauri) {
+    return invoke('memori_health', { port });
+  }
+  const url = `http://127.0.0.1:${port}/health`;
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    throw new Error(`Health check failed: ${resp.status}`);
+  }
+  const data = await resp.json();
+  return data.status;
 }
 
 export async function config(port: number = DEFAULT_PORT) {
