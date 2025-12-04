@@ -1,0 +1,16 @@
+name: upstream-check
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report upstream status
+        run: |
+          echo "This workflow is a placeholder for upstream sync."
+          echo "Add remotes 'upstream-storynexus' and 'upstream-memori' to enable automated checks."

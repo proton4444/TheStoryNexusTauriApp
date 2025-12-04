@@ -95,6 +95,14 @@ To run Tauri create release build:
 npm run tauri build
 ```
 
+## Memory integration status
+
+- A FastAPI sidecar (`sidecar/`) runs on `localhost:9876` and can be started automatically in the desktop build. It exposes health/config, search/context, manual memory add, and completion endpoints.
+- The Story Dashboard now includes a Memory Panel (toggle on the right) that lets you search memories, view recent context, add new facts, and import lorebook entries scoped to the active story. In the web build the panel still works against the HTTP sidecar if it is running locally.
+- Tauri now exposes proxy commands for memory endpoints to avoid CORS in the desktop shell; the frontend falls back to HTTP when not in Tauri.
+- Partial ingestion: completions are written back to memory automatically, and prompts can be ingested (opt-in in `useMemoryCompletion`). Full “conscious ingest”/extraction remains on the roadmap.
+- The sidecar exposes Swagger/ReDoc at `http://127.0.0.1:9876/docs` and `http://127.0.0.1:9876/redoc`. See `docs/api-reference.md`.
+
 ## Screenshots
 
 ![App Screenshot](screenshots/Home.jpg)

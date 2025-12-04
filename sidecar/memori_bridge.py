@@ -13,11 +13,19 @@ from sidecar.llm import CompletionClient, LlmConfig
 
 logger = logging.getLogger(__name__)
 
+tags_metadata = [
+    {"name": "system", "description": "Health and configuration endpoints"},
+    {"name": "memory", "description": "Manual memory management endpoints"},
+    {"name": "session", "description": "Session lifecycle endpoints"},
+    {"name": "completion", "description": "Memory-aware LLM completion"},
+]
+
 # Minimal FastAPI app; endpoints are wired to a pluggable backend (stub or Memori).
 app = FastAPI(
     title="Memori Sidecar",
-    version="0.3.0",
+    version="0.4.0",
     description="FastAPI wrapper around Memori for StoryNexus integration.",
+    openapi_tags=tags_metadata,
 )
 settings = Settings()
 backend = select_backend(settings)
@@ -104,6 +112,57 @@ class MemoryAddResponse(BaseModel):
     story_id: str
 
 
+class ExtractionRequest(BaseModel):
+    story_id: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1)
+    completion: str = Field(..., min_length=1)
+    category: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+class ExtractionResponse(BaseModel):
+    memory_id: str
+    story_id: str
+
+
+class IngestRequest(BaseModel):
+    story_id: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1)
+    completion: str = Field(..., min_length=1)
+    injected_memories: List[str] = Field(default_factory=list)
+    category: Optional[str] = None
+    session_id: Optional[str] = None
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
+    max_chars: int = Field(default=4000, ge=500, le=20000)
+
+
+class IngestResponse(BaseModel):
+    memory_id: str
+    story_id: str
+    truncated: bool
+
+
+def _build_ingest_content(
+    prompt: str,
+    completion: str,
+    injected: List[str],
+    provider: Optional[str],
+    model: Optional[str],
+    max_chars: int,
+) -> tuple[str, bool]:
+    header = f"Provider: {provider or 'unknown'} | Model: {model or 'unknown'} | Injected: {len(injected)}"
+    combined = (
+        f"{header}\n\n"
+        f"Prompt:\n{prompt}\n\n"
+        f"Completion:\n{completion}\n\n"
+        f"Injected memories:\n" + "\n".join(injected)
+    )
+    if len(combined) <= max_chars:
+        return combined, False
+    return combined[:max_chars], True
+
+
 @app.get("/health", tags=["system"])
 async def health() -> dict[str, str]:
     """Lightweight health probe for the sidecar."""
@@ -138,6 +197,39 @@ async def memory_add(payload: MemoryAddRequest) -> MemoryAddResponse:
         session_id=payload.session_id,
     )
     return MemoryAddResponse(memory_id=entry.memory_id, story_id=entry.story_id)
+
+
+@app.post("/extract", tags=["memory"], response_model=ExtractionResponse)
+async def extract(payload: ExtractionRequest) -> ExtractionResponse:
+    """Store a combined prompt+completion artifact for later recall."""
+    combined = f"Prompt:\\n{payload.prompt}\\n\\nCompletion:\\n{payload.completion}"
+    entry = get_backend().add_memory(
+        story_id=payload.story_id,
+        content=combined,
+        category=payload.category or "extraction",
+        session_id=payload.session_id,
+    )
+    return ExtractionResponse(memory_id=entry.memory_id, story_id=entry.story_id)
+
+
+@app.post("/ingest", tags=["memory"], response_model=IngestResponse)
+async def ingest(payload: IngestRequest) -> IngestResponse:
+    """Store prompt, completion, and injected memories in one artifact."""
+    combined, truncated = _build_ingest_content(
+        prompt=payload.prompt,
+        completion=payload.completion,
+        injected=payload.injected_memories,
+        provider=payload.llm_provider,
+        model=payload.llm_model,
+        max_chars=payload.max_chars,
+    )
+    entry = get_backend().add_memory(
+        story_id=payload.story_id,
+        content=combined,
+        category=payload.category or "ingest",
+        session_id=payload.session_id,
+    )
+    return IngestResponse(memory_id=entry.memory_id, story_id=entry.story_id, truncated=truncated)
 
 
 @app.delete("/memory/{story_id}", tags=["memory"])
@@ -199,6 +291,36 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
     except Exception as exc:  # pragma: no cover - runtime failure path
         logger.error("LLM completion failed: %s", exc)
         raise HTTPException(status_code=500, detail="LLM completion failed") from exc
+    # Store the completion text as a memory entry for downstream context.
+    try:
+        get_backend().add_memory(
+            story_id=payload.story_id,
+            content=completion_text,
+            category="completion",
+            session_id=session_id,
+        )
+    except Exception as exc:  # pragma: no cover - best-effort persistence
+        logger.warning("Could not persist completion memory: %s", exc)
+
+    # Store combined prompt + completion + injected memories for conscious ingest.
+    try:
+        combined, truncated = _build_ingest_content(
+            prompt=payload.prompt,
+            completion=completion_text,
+            injected=injected,
+            provider=chosen_provider,
+            model=chosen_model,
+            max_chars=payload.inject_limit * 2000 if payload.inject_limit else 4000,
+        )
+        get_backend().add_memory(
+            story_id=payload.story_id,
+            content=combined,
+            category="ingest",
+            session_id=session_id,
+        )
+    except Exception as exc:  # pragma: no cover - best-effort persistence
+        logger.warning("Could not persist ingest artifact: %s", exc)
+
     return CompletionResponse(
         completion=completion_text,
         story_id=payload.story_id,

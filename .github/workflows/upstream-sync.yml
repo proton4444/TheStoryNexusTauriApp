@@ -1,0 +1,34 @@
+name: upstream-sync
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    if: ${{ secrets.UPSTREAM_STORYNEXUS_URL != '' && secrets.UPSTREAM_MEMORI_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Add remotes
+        run: |
+          git remote add upstream-storynexus "${{ secrets.UPSTREAM_STORYNEXUS_URL }}"
+          git remote add upstream-memori "${{ secrets.UPSTREAM_MEMORI_URL }}"
+          git fetch upstream-storynexus
+          git fetch upstream-memori
+      - name: Attempt merge (dry-run)
+        run: |
+          git checkout develop || git checkout -b develop
+          git merge --no-commit --no-ff upstream-storynexus/main || echo "Merge conflicts detected; open a PR manually."
+      - name: Report
+        run: |
+          echo "Upstream sync checked. If conflicts occurred, resolve manually and push a PR."
+
+  guardrail:
+    if: ${{ secrets.UPSTREAM_STORYNEXUS_URL == '' || secrets.UPSTREAM_MEMORI_URL == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip (remotes not configured)
+        run: echo "Upstream remotes not configured; set secrets UPSTREAM_STORYNEXUS_URL and UPSTREAM_MEMORI_URL to enable sync."

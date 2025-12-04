@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "memory",
+  "description": "Permissions required for the Memori sidecar (spawn + HTTP)",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "shell:allow",
+    "http:default"
+  ]
+}

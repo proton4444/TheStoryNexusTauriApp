@@ -85,6 +85,104 @@ def test_completion_injects_recent_memories_and_sets_session(monkeypatch):
     assert body["injected_memories"] == ["Memory B", "Memory A"]
 
 
+def test_completion_persists_completion_text(monkeypatch):
+    monkeypatch.setenv("MEMORI_SIDECAR_LLM_PROVIDER", "stub")
+    module = importlib.reload(memori_bridge)
+    client = TestClient(module.app)
+
+    completion_resp = client.post(
+        "/completion",
+        json={"story_id": "story-2", "prompt": "Remember this line", "inject_limit": 0},
+    )
+    assert completion_resp.status_code == 200
+
+    # Completion should be written back to memory context
+    context_resp = client.post("/context", json={"story_id": "story-2", "limit": 5})
+    assert context_resp.status_code == 200
+    memories = [m["content"] for m in context_resp.json()["memories"]]
+    assert any("Remember this line" in m or "stub-llm" in m for m in memories)
+
+
+def test_extract_endpoint_combines_prompt_and_completion(monkeypatch):
+    module = importlib.reload(memori_bridge)
+    client = TestClient(module.app)
+
+    resp = client.post(
+        "/extract",
+        json={
+            "story_id": "story-3",
+            "prompt": "Who is the hero?",
+            "completion": "The hero is Aria of the North.",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["story_id"] == "story-3"
+    assert body["memory_id"]
+
+    context_resp = client.post("/context", json={"story_id": "story-3", "limit": 5})
+    assert context_resp.status_code == 200
+    contents = [m["content"] for m in context_resp.json()["memories"]]
+    assert any("Who is the hero?" in c and "Aria" in c for c in contents)
+
+
+def test_memories_are_isolated_by_story():
+    client = TestClient(app)
+    client.post("/memory/add", json={"story_id": "a", "content": "Only in A"})
+    client.post("/memory/add", json={"story_id": "b", "content": "Only in B"})
+
+    search_a = client.post("/search", json={"story_id": "a", "query": "Only", "limit": 5})
+    search_b = client.post("/search", json={"story_id": "b", "query": "Only", "limit": 5})
+
+    assert search_a.status_code == 200
+    assert search_b.status_code == 200
+    contents_a = [r["content"] for r in search_a.json()["results"]]
+    contents_b = [r["content"] for r in search_b.json()["results"]]
+    assert "Only in A" in contents_a
+    assert "Only in B" not in contents_a
+    assert "Only in B" in contents_b
+    assert "Only in A" not in contents_b
+
+
+def test_ingest_combines_prompt_completion_and_injected(monkeypatch):
+    module = importlib.reload(memori_bridge)
+    client = TestClient(module.app)
+    payload = {
+        "story_id": "story-4",
+        "prompt": "Prompt text",
+        "completion": "Completion text",
+        "injected_memories": ["Memo1", "Memo2"],
+    }
+    resp = client.post("/ingest", json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["story_id"] == "story-4"
+
+    ctx = client.post("/context", json={"story_id": "story-4", "limit": 5})
+    contents = [m["content"] for m in ctx.json()["memories"]]
+    assert any("Prompt text" in c and "Completion text" in c for c in contents)
+    assert any("Memo1" in c and "Memo2" in c for c in contents)
+
+
+def test_completion_auto_ingests_prompt_and_injected(monkeypatch):
+    # Force stub LLM for deterministic output
+    monkeypatch.setenv("MEMORI_SIDECAR_LLM_PROVIDER", "stub")
+    module = importlib.reload(memori_bridge)
+    client = TestClient(module.app)
+    client.post("/memory/add", json={"story_id": "story-5", "content": "Lore A"})
+
+    resp = client.post(
+        "/completion",
+        json={"story_id": "story-5", "prompt": "Tell me", "inject_limit": 1},
+    )
+    assert resp.status_code == 200
+
+    ctx = client.post("/context", json={"story_id": "story-5", "limit": 5})
+    contents = [m["content"] for m in ctx.json()["memories"]]
+    # Should include the ingest artifact with prompt and injected memory
+    assert any("Prompt:\nTell me" in c and "Injected memories:" in c for c in contents)
+
+
 def test_clear_memory_removes_story_memories():
     client = TestClient(app)
     client.post("/memory/add", json={"story_id": "story-1", "content": "A"})

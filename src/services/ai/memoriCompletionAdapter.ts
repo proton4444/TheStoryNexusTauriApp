@@ -1,7 +1,8 @@
 import { createPromptParser } from "@/features/prompts/services/promptParser";
 import { db } from "@/services/database";
-import { PromptParserConfig, PromptMessage } from "@/types/story";
+import { PromptParserConfig } from "@/types/story";
 import { memoriCompletion } from "@/services/memory/memoriCompletion";
+import { ingestConversation } from "@/services/memory/memoryService";
 
 export async function memoriCompletionAdapter(config: PromptParserConfig, storyId: string) {
   const parser = createPromptParser();
@@ -12,5 +13,17 @@ export async function memoriCompletionAdapter(config: PromptParserConfig, storyI
   const prompt = await db.prompts.get(config.promptId);
   const temperature = prompt?.temperature ?? 0.7;
   const maxTokens = prompt?.maxTokens ?? 2048;
-  return memoriCompletion({ messages, temperature, maxTokens, storyId });
+  const promptText = messages.map((m) => `${m.role}: ${m.content}`).join("\n");
+  const response = await memoriCompletion({ messages, temperature, maxTokens, storyId });
+  // Best-effort extraction storage for future recall
+  if (response?.completion) {
+    await ingestConversation({
+      storyId,
+      prompt: promptText,
+      completion: response.completion,
+      injectedMemories: response.injected_memories,
+      category: "ingest",
+    });
+  }
+  return response;
 }

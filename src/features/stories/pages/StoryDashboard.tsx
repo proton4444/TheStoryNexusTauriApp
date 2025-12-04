@@ -19,8 +19,8 @@ import { useStoryStore } from "@/features/stories/stores/useStoryStore";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "react-router";
-import { useStoryContext } from "@/features/stories/context/StoryContext";
 import { useChapterStore } from "@/features/chapters/stores/useChapterStore";
+import { MemoryPanel } from "@/features/memory/components/MemoryPanel";
 
 export default function StoryDashboard() {
     const { storyId } = useParams();
@@ -52,6 +52,8 @@ export default function StoryDashboard() {
     const toggleSidebar = () => {
         setIsExpanded(!isExpanded);
     };
+
+    const [showMemoryPanel, setShowMemoryPanel] = useState(true);
 
     const isActive = (path: string) => {
         const currentPath = location.pathname.replace(/\/$/, '');
@@ -149,7 +151,29 @@ export default function StoryDashboard() {
                 "flex-1 transition-all duration-300 ease-in-out",
                 isExpanded ? "ml-[150px]" : "ml-12"
             )}>
-                <Outlet />
+                <div className="flex h-full">
+                    <div className={cn("flex-1", showMemoryPanel && storyId ? "pr-4" : "")}>
+                        <div className="flex items-center justify-end px-4 py-2 border-b bg-muted/30">
+                            <div className="flex items-center gap-2">
+                                {storyId && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowMemoryPanel((prev) => !prev)}
+                                    >
+                                        {showMemoryPanel ? "Hide Memory Panel" : "Show Memory Panel"}
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                        <Outlet />
+                    </div>
+                    {storyId && showMemoryPanel && (
+                        <div className="w-[360px] border-l bg-muted/20 p-4 overflow-y-auto">
+                            <MemoryPanel storyId={storyId} />
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

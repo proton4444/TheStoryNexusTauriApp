@@ -1,5 +1,5 @@
-import { Link, Outlet } from "react-router";
-import { Home, Info } from "lucide-react";
+﻿import { Link, Outlet } from "react-router";
+import { Home } from "lucide-react";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { useSidecarBootstrap } from "@/hooks/useSidecarBootstrap";
@@ -35,7 +35,7 @@ export function MainLayout() {
                     <div className="text-sm text-muted-foreground">
                         {sidecar.ready ? (
                             <span>
-                                Sidecar: {sidecar.backend} · LLM: {sidecar.llmProvider} ({sidecar.llmModel})
+                                Sidecar: {sidecar.backend} | LLM: {sidecar.llmProvider} ({sidecar.llmModel})
                             </span>
                         ) : (
                             <span>Sidecar: {sidecar.message}</span>
