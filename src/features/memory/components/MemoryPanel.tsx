@@ -201,6 +201,68 @@ export function MemoryPanel({ storyId }: Props) {
             </div>
           )}
 
+          {/* Entity Display Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Entities</span>
+              <Badge variant="secondary">
+                {(() => {
+                  const allMemories = [...context, ...results];
+                  const categories = new Set(allMemories.map(m => m.category).filter(Boolean));
+                  return categories.size;
+                })()}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-2 min-h-[2rem]">
+              {(() => {
+                const allMemories = [...context, ...results];
+                const entityCategories = ['character', 'location', 'item', 'faction', 'event'];
+                const entities: { category: string; name: string }[] = [];
+
+                allMemories.forEach(memory => {
+                  const category = memory.category?.toLowerCase() || 'note';
+                  if (entityCategories.includes(category)) {
+                    // Extract entity name from content (first few words or before colon)
+                    const colonIndex = memory.content.indexOf(':');
+                    const name = colonIndex > 0
+                      ? memory.content.substring(0, colonIndex).trim()
+                      : memory.content.split(' ').slice(0, 3).join(' ');
+                    if (!entities.find(e => e.name === name && e.category === category)) {
+                      entities.push({ category, name });
+                    }
+                  }
+                });
+
+                if (entities.length === 0) {
+                  return (
+                    <span className="text-xs text-muted-foreground">
+                      No entities yet. Add memories with categories like "character", "location", "item".
+                    </span>
+                  );
+                }
+
+                const categoryColors: Record<string, string> = {
+                  character: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
+                  location: 'bg-green-500/20 text-green-700 dark:text-green-300',
+                  item: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+                  faction: 'bg-purple-500/20 text-purple-700 dark:text-purple-300',
+                  event: 'bg-rose-500/20 text-rose-700 dark:text-rose-300',
+                };
+
+                return entities.slice(0, 12).map((entity, idx) => (
+                  <Badge
+                    key={`${entity.category}-${entity.name}-${idx}`}
+                    variant="outline"
+                    className={`text-xs ${categoryColors[entity.category] || ''}`}
+                  >
+                    <span className="capitalize mr-1 opacity-60">{entity.category[0]}:</span>
+                    {entity.name.length > 20 ? entity.name.substring(0, 20) + '...' : entity.name}
+                  </Badge>
+                ));
+              })()}
+            </div>
+          </div>
+
           {error && <p className="text-sm text-destructive">⚠ {error}</p>}
         </CardContent>
       </Card>
