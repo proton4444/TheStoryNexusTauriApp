@@ -288,12 +288,26 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
     session_id = payload.session_id or str(uuid.uuid4())
     chosen_model = payload.model or settings.llm_model
     chosen_provider = settings.llm_provider
-    injected = [
-        entry.content
-        for entry in get_backend().recent(
-            story_id=payload.story_id, limit=payload.inject_limit
-        )
-    ]
+    
+    # Get recent memories
+    recent_memories = get_backend().recent(
+        story_id=payload.story_id, limit=payload.inject_limit
+    )
+    
+    # Also search for relevant memories based on prompt
+    search_results = get_backend().search(
+        story_id=payload.story_id, query=payload.prompt[:500], limit=payload.inject_limit
+    )
+    
+    # Merge unique memories (recent + relevant)
+    seen_ids = set()
+    injected = []
+    for entry in recent_memories + search_results:
+        if entry.memory_id not in seen_ids:
+            seen_ids.add(entry.memory_id)
+            injected.append(entry.content)
+        if len(injected) >= payload.inject_limit * 2:  # Cap at 2x limit
+            break
     llm_client = get_llm_client()
     try:
         completion_text = await llm_client.complete(payload.prompt)

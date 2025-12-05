@@ -235,11 +235,29 @@ class MemoriBackend(MemoryBackend):
             return sqlite3.connect(settings.memori_db_path)
 
         self.memori = Memori(conn=conn_factory)
-        # Apply LLM-related settings for future completion wiring.
+        
+        # Apply LLM-related settings
         self.memori.config.llm.provider = settings.llm_provider
         self.memori.config.llm.version = settings.llm_model
         if settings.openai_api_key:
             self.memori.config.api_key = settings.openai_api_key
+            
+        # Set recall configuration for better memory retrieval
+        self.memori.config.recall_facts_limit = 5
+        self.memori.config.recall_relevance_threshold = 0.1
+        
+        # Register OpenAI client if API key is available
+        if settings.openai_api_key and settings.llm_provider == "openai":
+            try:
+                from openai import OpenAI
+                openai_client = OpenAI(api_key=settings.openai_api_key)
+                self.memori.openai.register(openai_client)
+                logger.info("Registered OpenAI client with Memori")
+            except ImportError:
+                logger.warning("OpenAI package not available for Memori registration")
+            except Exception as e:
+                logger.warning(f"Could not register OpenAI client: {e}")
+        
         # Build schema (no banner)
         builder = Builder(self.memori.config)
         builder.display_banner = False
