@@ -7,6 +7,9 @@ export type CompletionRequest = {
   prompt: string;
   sessionId?: string;
   injectLimit?: number;
+  injectLimit?: number;
+  model?: string;
+  maxContextTokens?: number;
 };
 
 export type CompletionResponse = {
@@ -14,6 +17,7 @@ export type CompletionResponse = {
   story_id: string;
   session_id: string;
   injected_memories: string[];
+  extracted_entities?: string[];
   llm_provider?: string;
   llm_model?: string;
 };
@@ -36,9 +40,11 @@ export type MemorySearchRequest = {
 
 export type MemoryResult = {
   memory_id: string;
+  story_id?: string;
   content: string;
   category?: string;
   session_id?: string;
+  created_at?: string;
 };
 
 export type MemoryContextRequest = {
@@ -121,17 +127,42 @@ export async function config(port: number = DEFAULT_PORT): Promise<ConfigRespons
   return resp.json() as Promise<ConfigResponse>;
 }
 
-async function postJSON<T>(path: string, body: Record<string, unknown>, port = DEFAULT_PORT): Promise<T> {
+async function postJSON<T>(
+  path: string,
+  body: Record<string, unknown>,
+  port = DEFAULT_PORT,
+  timeoutMs = 30000, // 30 second default timeout
+): Promise<T> {
   const url = `http://127.0.0.1:${port}${path}`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    throw new Error(`Request failed: ${resp.status} ${resp.statusText}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    console.log(`[memoryService] POST ${path} started`);
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) {
+      const errorText = await resp.text().catch(() => 'Unknown error');
+      console.error(`[memoryService] ${path} failed: ${resp.status} - ${errorText}`);
+      throw new Error(`Request failed: ${resp.status} ${resp.statusText}`);
+    }
+    console.log(`[memoryService] POST ${path} succeeded`);
+    return resp.json() as Promise<T>;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error(`[memoryService] ${path} timed out after ${timeoutMs}ms`);
+      throw new Error(`Request timed out after ${timeoutMs / 1000} seconds`);
+    }
+    console.error(`[memoryService] ${path} error:`, error);
+    throw error;
   }
-  return resp.json() as Promise<T>;
 }
 
 export async function createSession(storyId: string, port = DEFAULT_PORT) {
@@ -144,6 +175,17 @@ export async function createSession(storyId: string, port = DEFAULT_PORT) {
     port,
   );
 }
+
+export type MemoryItem = {
+  content: string;
+  category?: string;
+  session_id?: string;
+};
+
+export type MemoryBulkAddRequest = {
+  storyId: string;
+  items: MemoryItem[];
+};
 
 export async function addMemory(req: MemoryAddRequest, port = DEFAULT_PORT) {
   if (isTauri) {
@@ -169,12 +211,51 @@ export async function addMemory(req: MemoryAddRequest, port = DEFAULT_PORT) {
   );
 }
 
-export async function searchMemories(req: MemorySearchRequest, port = DEFAULT_PORT): Promise<{ results: MemoryResult[] }> {
+export async function addMemories(req: MemoryBulkAddRequest, port = DEFAULT_PORT) {
+  if (isTauri) {
+    return invokeIfTauri('memori_add_memories', {
+      payload: {
+        story_id: req.storyId,
+        items: req.items,
+      },
+      port,
+    });
+  }
+  return postJSON<{ story_id: string; count: number }>(
+    '/memory/add/bulk',
+    {
+      story_id: req.storyId,
+      items: req.items,
+    },
+    port,
+  );
+}
+
+export async function deleteMemory(storyId: string, memoryId: string, port = DEFAULT_PORT) {
+  if (isTauri) {
+    return invokeIfTauri<void>('memori_delete_memory', {
+      storyId,
+      memoryId,
+      port,
+    });
+  }
+  const url = `http://127.0.0.1:${port}/memory/${storyId}/${memoryId}`;
+  const resp = await fetch(url, { method: 'DELETE' });
+  if (!resp.ok) {
+    throw new Error(`Delete failed: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function searchMemories(
+  req: MemorySearchRequest,
+  port = DEFAULT_PORT,
+): Promise<{ results: MemoryResult[]; total?: number }> {
   console.log('[memoryService] searchMemories called:', { storyId: req.storyId, query: req.query, limit: req.limit, isTauri });
 
   if (isTauri) {
     try {
-      const result = await invokeIfTauri<{ results: MemoryResult[] }>('memori_search', {
+      const result = await invokeIfTauri<{ results: MemoryResult[]; total?: number }>('memori_search', {
         payload: {
           story_id: req.storyId,
           query: req.query,
@@ -190,13 +271,34 @@ export async function searchMemories(req: MemorySearchRequest, port = DEFAULT_PO
     }
   }
 
-  const result = await postJSON<{ results: MemoryResult[] }>(
+  const result = await postJSON<{ results: MemoryResult[]; total?: number }>(
     '/search',
     { story_id: req.storyId, query: req.query, limit: req.limit ?? 10 },
     port,
   );
   console.log('[memoryService] Fetch search result:', result);
   return result;
+}
+
+export async function listMemories(
+  req: MemoryListRequest,
+  port = DEFAULT_PORT,
+): Promise<MemoryListResponse> {
+  const payload = {
+    story_id: req.storyId,
+    query: req.query,
+    limit: req.limit ?? 100,
+    offset: req.offset ?? 0,
+  };
+
+  if (isTauri) {
+    return invokeIfTauri<MemoryListResponse>('memori_list_memories', {
+      payload,
+      port,
+    });
+  }
+
+  return postJSON<MemoryListResponse>('/memory/list', payload, port);
 }
 
 export async function getContext(req: MemoryContextRequest, port = DEFAULT_PORT): Promise<{ memories: MemoryResult[] }> {
@@ -224,10 +326,13 @@ export async function completeWithMemory(req: CompletionRequest, port = DEFAULT_
         prompt: req.prompt,
         session_id: req.sessionId,
         inject_limit: req.injectLimit ?? 3,
+        model: req.model,
+        max_context_tokens: req.maxContextTokens ?? 2000,
       },
       port,
     });
   }
+  // LLM completion + auto-extraction can take a while, use 120 second timeout
   return postJSON<CompletionResponse>(
     '/completion',
     {
@@ -235,8 +340,11 @@ export async function completeWithMemory(req: CompletionRequest, port = DEFAULT_
       prompt: req.prompt,
       session_id: req.sessionId,
       inject_limit: req.injectLimit ?? 3,
+      model: req.model,
+      max_context_tokens: req.maxContextTokens ?? 2000,
     },
     port,
+    120000, // 120 seconds timeout for LLM completion
   );
 }
 
@@ -302,5 +410,61 @@ export async function ingestConversation(req: IngestRequest, port = DEFAULT_PORT
       max_chars: req.maxChars ?? 4000,
     },
     port,
+  );
+}
+
+export type ExtractFromTextRequest = {
+  storyId: string;
+  text: string;
+  extractTypes?: string[];
+  model?: string;
+};
+
+export type ExtractedMemory = {
+  memory_id: string;
+  content: string;
+  category: string;
+};
+
+export type ExtractFromTextResponse = {
+  extracted_count: number;
+  memories: ExtractedMemory[];
+};
+
+export type MemoryListRequest = {
+  storyId?: string;
+  query?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type MemoryListResponse = {
+  memories: MemoryResult[];
+  total: number;
+};
+
+export async function extractFromText(req: ExtractFromTextRequest, port = DEFAULT_PORT) {
+  if (isTauri) {
+    return invokeIfTauri<ExtractFromTextResponse>('memori_extract_from_text', {
+      payload: {
+        story_id: req.storyId,
+        text: req.text,
+        extract_types: req.extractTypes ?? ["characters", "locations", "items", "facts"],
+        model: req.model,
+      },
+      port,
+    });
+  }
+  // LLM extraction can take a while, use 60 second timeout
+  return postJSON<ExtractFromTextResponse>(
+    '/extract-from-text',
+    {
+      story_id: req.storyId,
+      text: req.text,
+      extract_types: req.extractTypes ?? ["characters", "locations", "items", "facts"],
+      model: req.model,
+    },
+    port,
+    60000, // 60 seconds timeout for LLM extraction
   );
 }
