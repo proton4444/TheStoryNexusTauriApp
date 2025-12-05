@@ -22,15 +22,24 @@ export function MemoryPanel({ storyId }: Props) {
     importing,
     lastImported,
     error,
+    isConnected,
     setQuery,
     search,
     refreshContext,
     addMemory,
     importLorebook,
+    checkHealth,
+    setCurrentStory,
   } = useMemoryStore();
   const [draft, setDraft] = useState("");
   const [category, setCategory] = useState("");
   const [showStats, setShowStats] = useState(false);
+
+  // Check health and set current story on mount
+  useEffect(() => {
+    checkHealth();
+    setCurrentStory(storyId);
+  }, [checkHealth, setCurrentStory, storyId]);
 
   useEffect(() => {
     refreshContext(storyId);
@@ -43,15 +52,26 @@ export function MemoryPanel({ storyId }: Props) {
 
   const handleAddMemory = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addMemory(storyId, draft, category || undefined);
+    await addMemory(draft, category || undefined, storyId);
     setDraft("");
   };
 
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Story Memory</CardTitle>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Story Memory</CardTitle>
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+                title={isConnected ? 'Sidecar connected' : 'Sidecar disconnected'}
+              />
+              <span className="text-xs text-muted-foreground">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
