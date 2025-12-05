@@ -1,38 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "memory",
-  "description": "Permissions required for the Memori sidecar (spawn + HTTP)",
+  "description": "Permissions required for the Memori sidecar",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
-    "opener:default",
-    {
-      "identifier": "shell:allow-spawn",
-      "allow": [
-        {
-          "name": "python",
-          "cmd": "python",
-          "args": true
-        },
-        {
-          "name": "python3",
-          "cmd": "python3",
-          "args": true
-        }
-      ]
-    },
-    {
-      "identifier": "http:allow-fetch",
-      "allow": [
-        {
-          "url": "http://127.0.0.1:*/*"
-        },
-        {
-          "url": "http://localhost:*/*"
-        }
-      ]
-    }
+    "opener:default"
   ]
 }

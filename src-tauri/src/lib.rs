@@ -17,25 +17,10 @@ pub fn run() {
     tauri::Builder::default()
         .manage(SidecarState::default())
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            // Auto-start sidecar on app launch
-            let state = app.state::<SidecarState>();
-            let cwd = std::env::current_dir().unwrap_or_else(|_| {
-                std::path::PathBuf::from(".")
-            });
-            
-            // Attempt to start sidecar (non-blocking, best-effort)
-            if let Err(e) = state.start("python", cwd, "127.0.0.1", 9876) {
-                eprintln!("[sidecar] Auto-start failed: {}. Frontend will retry.", e);
-            } else {
-                println!("[sidecar] Auto-started on port 9876");
-            }
-            
-            Ok(())
-        })
-        .on_window_event(|event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
-                let state = event.window().state::<SidecarState>();
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                use tauri::Manager;
+                let state = window.state::<SidecarState>();
                 let _ = state.stop();
             }
         })

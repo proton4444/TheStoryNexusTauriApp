@@ -6,7 +6,7 @@ use std::{
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 const DEFAULT_PORT: u16 = 9876;
 const DEFAULT_HOST: &str = "127.0.0.1";
@@ -49,7 +49,7 @@ impl SidecarState {
         Ok(())
     }
 
-    fn stop(&self) -> Result<(), String> {
+    pub fn stop(&self) -> Result<(), String> {
         let mut child_guard = self.child.lock().map_err(|_| "sidecar lock poisoned")?;
         if let Some(mut child) = child_guard.take() {
             child.kill().ok();
