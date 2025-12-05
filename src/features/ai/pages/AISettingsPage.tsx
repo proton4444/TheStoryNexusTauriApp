@@ -7,8 +7,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronRight, Loader2 } from "lucide-react";
 import { aiService } from '@/services/ai/AIService';
 import { toast } from 'react-toastify';
-import { AIModel } from '@/types/story';
+import { AIModel, AllowedModel } from '@/types/story';
 import { cn } from '@/lib/utils';
+import { ModelSelector } from '@/components/ui/model-selector';
 
 export default function AISettingsPage() {
     const [openaiKey, setOpenaiKey] = useState('');
@@ -18,6 +19,8 @@ export default function AISettingsPage() {
     const [openaiModels, setOpenaiModels] = useState<AIModel[]>([]);
     const [openrouterModels, setOpenrouterModels] = useState<AIModel[]>([]);
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+    const [defaultModel, setDefaultModel] = useState<AllowedModel | undefined>();
+    const [localModelsState, setLocalModelsState] = useState<AIModel[]>([]);
 
     useEffect(() => {
         loadInitialData();
@@ -51,6 +54,11 @@ export default function AISettingsPage() {
 
             setOpenaiModels(openaiModels);
             setOpenrouterModels(openrouterModels);
+            setLocalModelsState(localModels);
+
+            // Load default model
+            const savedDefaultModel = aiService.getDefaultModel();
+            if (savedDefaultModel) setDefaultModel(savedDefaultModel);
         } catch (error) {
             console.error('Error loading AI settings:', error);
             toast.error('Failed to load AI settings');
@@ -376,6 +384,31 @@ export default function AISettingsPage() {
                                         ))}
                                 </CollapsibleContent>
                             </Collapsible>
+                        </CardContent>
+                    </Card>
+
+                    {/* Default Model Section */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Default Model</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-2">
+                                <Label>Select your default AI model</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    This model will be pre-selected when generating content.
+                                </p>
+                                <ModelSelector
+                                    models={[...openaiModels, ...openrouterModels, ...localModelsState]}
+                                    value={defaultModel}
+                                    onSelect={async (model) => {
+                                        setDefaultModel(model);
+                                        await aiService.setDefaultModel(model);
+                                        toast.success(model ? `Default model set to ${model.name}` : 'Default model cleared');
+                                    }}
+                                    placeholder="Choose a default model..."
+                                />
+                            </div>
                         </CardContent>
                     </Card>
                 </div>

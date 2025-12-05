@@ -1,4 +1,4 @@
-import { completeWithMemory } from "./memoryService";
+import { completeWithMemory, CompletionResponse } from "./memoryService";
 import { PromptMessage } from "@/types/story";
 
 type Request = {
@@ -8,7 +8,7 @@ type Request = {
   storyId: string;
 };
 
-export async function memoriCompletion(req: Request) {
+export async function memoriCompletion(req: Request): Promise<CompletionResponse> {
   const promptText = req.messages.map((m) => `${m.role}: ${m.content}`).join("\n");
   return completeWithMemory({
     prompt: promptText,

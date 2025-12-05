@@ -20,7 +20,6 @@ interface AIState {
     isLoading: boolean;
     error: string | null;
     useMemory: boolean;
-    useMemory: boolean;
 
     // Initialize AI service and load settings
     initialize: () => Promise<void>;

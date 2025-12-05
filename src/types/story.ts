@@ -128,6 +128,7 @@ export interface AISettings extends BaseEntity {
     availableModels: AIModel[];
     lastModelsFetch?: Date;
     localApiUrl?: string;
+    defaultModel?: AllowedModel;
 }
 
 // Note types

@@ -38,7 +38,7 @@ export function MainLayout() {
                                 Sidecar: {sidecar.backend} | LLM: {sidecar.llmProvider} ({sidecar.llmModel})
                             </span>
                         ) : (
-                            <span>Sidecar: {sidecar.message}</span>
+                            <span>Sidecar: {'message' in sidecar ? sidecar.message : 'Unavailable'}</span>
                         )}
                     </div>
                 </div>

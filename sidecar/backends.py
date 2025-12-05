@@ -79,6 +79,122 @@ class InMemoryBackend(MemoryBackend):
         self._memories.clear()
 
 
+class SQLiteBackend(MemoryBackend):
+    """Lightweight SQLite-based backend for persistence without ML dependencies."""
+
+    def __init__(self, db_path: str = "memori.db") -> None:
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self) -> None:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS memories (
+                memory_id TEXT PRIMARY KEY,
+                story_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                category TEXT,
+                session_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_story_id ON memories(story_id)")
+        conn.commit()
+        conn.close()
+        logger.info("SQLite backend initialized at %s", self.db_path)
+
+    def add_memory(
+        self, story_id: str, content: str, category: Optional[str], session_id: Optional[str]
+    ) -> MemoryEntry:
+        memory_id = str(uuid.uuid4())
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO memories (memory_id, story_id, content, category, session_id) VALUES (?, ?, ?, ?, ?)",
+            (memory_id, story_id, content, category, session_id),
+        )
+        conn.commit()
+        conn.close()
+        return MemoryEntry(
+            memory_id=memory_id,
+            story_id=story_id,
+            content=content,
+            category=category,
+            session_id=session_id,
+        )
+
+    def search(self, story_id: str, query: str, limit: int) -> List[MemoryEntry]:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT memory_id, story_id, content, category, session_id
+            FROM memories
+            WHERE story_id = ? AND content LIKE ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (story_id, f"%{query}%", limit),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            MemoryEntry(
+                memory_id=row[0],
+                story_id=row[1],
+                content=row[2],
+                category=row[3],
+                session_id=row[4],
+            )
+            for row in rows
+        ]
+
+    def recent(self, story_id: str, limit: int) -> List[MemoryEntry]:
+        if limit <= 0:
+            return []
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT memory_id, story_id, content, category, session_id
+            FROM memories
+            WHERE story_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (story_id, limit),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            MemoryEntry(
+                memory_id=row[0],
+                story_id=row[1],
+                content=row[2],
+                category=row[3],
+                session_id=row[4],
+            )
+            for row in rows
+        ]
+
+    def clear_story(self, story_id: str) -> int:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM memories WHERE story_id = ?", (story_id,))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
+
+    def clear_all(self) -> None:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM memories")
+        conn.commit()
+        conn.close()
+
+
 class MemoriBackend(MemoryBackend):
     """Adapter to the Memori engine with SQLite storage.
 
@@ -249,6 +365,9 @@ class MemoriBackend(MemoryBackend):
 
 
 def select_backend(settings: Settings) -> MemoryBackend:
+    if settings.backend == "sqlite":
+        logger.info("Initializing SQLite backend at %s", settings.memori_db_path)
+        return SQLiteBackend(settings.memori_db_path)
     if settings.backend == "memori":
         try:
             logger.info("Initializing Memori backend with SQLite at %s", settings.memori_db_path)
@@ -256,3 +375,4 @@ def select_backend(settings: Settings) -> MemoryBackend:
         except Exception as exc:
             logger.warning("Falling back to stub backend: %s", exc)
     return InMemoryBackend()
+

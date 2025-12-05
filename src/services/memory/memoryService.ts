@@ -14,7 +14,12 @@ export type CompletionResponse = {
   story_id: string;
   session_id: string;
   injected_memories: string[];
+  llm_provider?: string;
+  llm_model?: string;
 };
+
+// Type alias for backward compatibility
+export type MemoriCompletionResponse = CompletionResponse;
 
 export type MemoryAddRequest = {
   storyId: string;
@@ -95,23 +100,25 @@ export async function health(port: number = DEFAULT_PORT): Promise<HealthRespons
   return data.status;
 }
 
-export async function config(port: number = DEFAULT_PORT) {
+export type ConfigResponse = {
+  backend: string;
+  host: string;
+  port: number;
+  process_id: string;
+  llm_provider: string;
+  llm_model: string;
+};
+
+export async function config(port: number = DEFAULT_PORT): Promise<ConfigResponse> {
   if (isTauri) {
-    return invokeIfTauri('memori_config', { port });
+    return invokeIfTauri<ConfigResponse>('memori_config', { port });
   }
   const url = `http://127.0.0.1:${port}/config`;
   const resp = await fetch(url);
   if (!resp.ok) {
     throw new Error(`Config request failed: ${resp.status} ${resp.statusText}`);
   }
-  return resp.json() as Promise<{
-    backend: string;
-    host: string;
-    port: number;
-    process_id: string;
-    llm_provider: string;
-    llm_model: string;
-  }>;
+  return resp.json() as Promise<ConfigResponse>;
 }
 
 async function postJSON<T>(path: string, body: Record<string, unknown>, port = DEFAULT_PORT): Promise<T> {
@@ -162,27 +169,39 @@ export async function addMemory(req: MemoryAddRequest, port = DEFAULT_PORT) {
   );
 }
 
-export async function searchMemories(req: MemorySearchRequest, port = DEFAULT_PORT) {
+export async function searchMemories(req: MemorySearchRequest, port = DEFAULT_PORT): Promise<{ results: MemoryResult[] }> {
+  console.log('[memoryService] searchMemories called:', { storyId: req.storyId, query: req.query, limit: req.limit, isTauri });
+
   if (isTauri) {
-    return invokeIfTauri('memori_search', {
-      payload: {
-        story_id: req.storyId,
-        query: req.query,
-        limit: req.limit ?? 10,
-      },
-      port,
-    });
+    try {
+      const result = await invokeIfTauri<{ results: MemoryResult[] }>('memori_search', {
+        payload: {
+          story_id: req.storyId,
+          query: req.query,
+          limit: req.limit ?? 10,
+        },
+        port,
+      });
+      console.log('[memoryService] Tauri search result:', result);
+      return result;
+    } catch (err) {
+      console.warn('[memoryService] Tauri invoke failed, falling back to fetch:', err);
+      // Fall through to fetch
+    }
   }
-  return postJSON<{ results: MemoryResult[] }>(
+
+  const result = await postJSON<{ results: MemoryResult[] }>(
     '/search',
     { story_id: req.storyId, query: req.query, limit: req.limit ?? 10 },
     port,
   );
+  console.log('[memoryService] Fetch search result:', result);
+  return result;
 }
 
-export async function getContext(req: MemoryContextRequest, port = DEFAULT_PORT) {
+export async function getContext(req: MemoryContextRequest, port = DEFAULT_PORT): Promise<{ memories: MemoryResult[] }> {
   if (isTauri) {
-    return invokeIfTauri('memori_context', {
+    return invokeIfTauri<{ memories: MemoryResult[] }>('memori_context', {
       payload: {
         story_id: req.storyId,
         limit: req.limit ?? 5,
@@ -197,9 +216,9 @@ export async function getContext(req: MemoryContextRequest, port = DEFAULT_PORT)
   );
 }
 
-export async function completeWithMemory(req: CompletionRequest, port = DEFAULT_PORT) {
+export async function completeWithMemory(req: CompletionRequest, port = DEFAULT_PORT): Promise<CompletionResponse> {
   if (isTauri) {
-    return invokeIfTauri('memori_completion', {
+    return invokeIfTauri<CompletionResponse>('memori_completion', {
       payload: {
         story_id: req.storyId,
         prompt: req.prompt,

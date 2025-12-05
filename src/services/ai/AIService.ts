@@ -1,4 +1,4 @@
-import { AIModel, AIProvider, AISettings, PromptMessage } from '@/types/story';
+import { AIModel, AIProvider, AISettings, AllowedModel, PromptMessage } from '@/types/story';
 import { db } from '../database';
 import OpenAI from 'openai';
 import { startSidecar, completeWithMemory as memoriComplete, CompletionResponse as MemoriCompletionResponse } from '../memory/memoryService';
@@ -549,6 +549,18 @@ export class AIService {
         return this.settings;
     }
 
+    getDefaultModel(): AllowedModel | undefined {
+        return this.settings?.defaultModel;
+    }
+
+    async setDefaultModel(model: AllowedModel | undefined): Promise<void> {
+        if (!this.settings) {
+            throw new Error('Settings not initialized');
+        }
+        await db.aiSettings.update(this.settings.id, { defaultModel: model });
+        this.settings.defaultModel = model;
+    }
+
     abortStream(): void {
         if (this.abortController) {
             console.log('[AIService] Aborting stream');
@@ -559,3 +571,4 @@ export class AIService {
 }
 
 export const aiService = AIService.getInstance();
+
