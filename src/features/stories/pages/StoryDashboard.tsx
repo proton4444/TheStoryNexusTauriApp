@@ -5,6 +5,7 @@ import {
     Bot,
     Sparkles,
     Sliders,
+    Database,
     BookOpen,
     Book,
     MessageSquare,
@@ -141,6 +142,7 @@ export default function StoryDashboard() {
                     isExpanded ? "items-start px-2" : "items-center"
                 )}>
                     <ThemeToggle isExpanded={isExpanded} />
+                    {navButton(<Database className="h-5 w-5" />, "/memories", "Memories")}
                     {navButton(<Home className="h-5 w-5" />, "/stories", "Stories")}
                     {navButton(<Sliders className="h-5 w-5" />, "/ai-settings", "AI Settings")}
                 </div>

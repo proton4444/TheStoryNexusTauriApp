@@ -404,6 +404,9 @@ export default function AISettingsPage() {
                                     onSelect={async (model) => {
                                         setDefaultModel(model);
                                         await aiService.setDefaultModel(model);
+                                        // Re-initialize the AI store so other components see the updated default model
+                                        const { useAIStore } = await import('@/features/ai/stores/useAIStore');
+                                        await useAIStore.getState().initialize();
                                         toast.success(model ? `Default model set to ${model.name}` : 'Default model cleared');
                                     }}
                                     placeholder="Choose a default model..."

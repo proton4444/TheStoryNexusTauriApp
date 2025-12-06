@@ -47,12 +47,12 @@ export function CreateStoryDialog() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="lg" className="w-64">
+                <Button size="lg" className="w-64" id="create-story-button" data-testid="create-story-button">
                     <PlusCircle className="mr-2 h-5 w-5" />
                     Create New Story
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px]" data-testid="create-story-dialog">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>Create New Story</DialogTitle>
@@ -65,6 +65,7 @@ export function CreateStoryDialog() {
                             <Label htmlFor="title">Title</Label>
                             <Input
                                 id="title"
+                                data-testid="story-title-input"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 placeholder="Enter story title"
@@ -72,13 +73,13 @@ export function CreateStoryDialog() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="author">Author</Label>
+                            <Label htmlFor="author">Author (optional)</Label>
                             <Input
                                 id="author"
+                                data-testid="story-author-input"
                                 value={author}
                                 onChange={(e) => setAuthor(e.target.value)}
                                 placeholder="Enter author name"
-                                required
                             />
                         </div>
                         <div className="grid gap-2">
@@ -108,7 +109,7 @@ export function CreateStoryDialog() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="submit">Create Story</Button>
+                        <Button type="submit" id="submit-story-button" data-testid="submit-story-button">Create Story</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

@@ -1,6 +1,7 @@
 import { AIModel, Prompt, AllowedModel } from "@/types/story";
 import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarSub, MenubarSubContent, MenubarSubTrigger, MenubarTrigger } from "./menubar";
 import { Loader2, ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router";
 
 interface AIGenerateMenuProps {
     isGenerating: boolean;
@@ -22,6 +23,7 @@ export function AIGenerateMenu({
     buttonText,
     onGenerate
 }: Omit<AIGenerateMenuProps, 'availableModels'>) {
+    const navigate = useNavigate();
     const filteredPrompts = prompts.filter(p => p.promptType === promptType);
 
     return (
@@ -78,7 +80,7 @@ export function AIGenerateMenu({
                                 </MenubarSub>
                             ))}
                             <MenubarSeparator />
-                            <MenubarItem>Configure Prompts...</MenubarItem>
+                            <MenubarItem onClick={() => navigate('/prompts')}>Configure Prompts...</MenubarItem>
                         </>
                     )}
                 </MenubarContent>

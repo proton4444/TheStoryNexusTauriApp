@@ -1,10 +1,14 @@
 import { create } from 'zustand';
 import {
   addMemory as addMemoryApi,
+  addMemories as addMemoriesApi,
+  deleteMemory as deleteMemoryApi,
   getContext as getContextApi,
   health as checkHealthApi,
   MemoryResult,
   searchMemories as searchMemoriesApi,
+  extractFromText as extractFromTextApi,
+  ExtractFromTextResponse,
 } from '@/services/memory/memoryService';
 import { db } from '@/services/database';
 
@@ -52,8 +56,10 @@ type MemoryState = {
   refreshContext: (storyId?: string, limit?: number) => Promise<void>;
 
   // Actions - Memory management
-  addMemory: (content: string, category?: string, storyId?: string) => Promise<void>;
+  addMemory: (content: string, category?: string) => Promise<void>;
+  deleteMemory: (memoryId: string) => Promise<void>;
   importLorebook: (storyId?: string) => Promise<number>;
+  extractFromText: (text: string, model?: string) => Promise<ExtractFromTextResponse>;
 
   // Actions - Reset
   reset: () => void;
@@ -157,11 +163,11 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     }
   },
 
-  // Add memory
-  addMemory: async (content: string, category?: string, storyId?: string) => {
-    const targetStoryId = storyId ?? get().currentStoryId;
+  // Add memory - always uses currentStoryId from store to enforce story isolation
+  addMemory: async (content: string, category?: string) => {
+    const { currentStoryId } = get();
 
-    if (!targetStoryId) {
+    if (!currentStoryId) {
       set({ error: 'No story selected' });
       return;
     }
@@ -170,9 +176,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
 
     set({ loading: true, error: undefined });
     try {
-      await addMemoryApi({ storyId: targetStoryId, content, category });
+      await addMemoryApi({ storyId: currentStoryId, content, category });
       // Refresh context after adding
-      await get().refreshContext(targetStoryId);
+      await get().refreshContext(currentStoryId);
       set({ loading: false });
     } catch (err) {
       console.error('[memory] add failed', err);
@@ -192,13 +198,16 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
     set({ importing: true, error: undefined, lastImported: null });
     try {
       const entries = await db.lorebookEntries.where('storyId').equals(targetStoryId).toArray();
-      for (const entry of entries) {
-        await addMemoryApi({
-          storyId: targetStoryId,
-          content: `${entry.name}: ${entry.description}`,
-          category: entry.category,
-        });
-      }
+      const memoryItems = entries.map(entry => ({
+        content: `${entry.name}: ${entry.description}`,
+        category: entry.category,
+      }));
+
+      await addMemoriesApi({
+        storyId: targetStoryId,
+        items: memoryItems,
+      });
+
       await get().refreshContext(targetStoryId);
       set({ importing: false, lastImported: entries.length });
       return entries.length;
@@ -206,6 +215,42 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       console.error('[memory] lorebook import failed', err);
       set({ error: 'Lorebook import failed', importing: false, lastImported: null });
       return 0;
+    }
+  },
+
+  extractFromText: async (text: string, model?: string) => {
+    const { currentStoryId } = get();
+    if (!currentStoryId) {
+      set({ error: 'No story selected' });
+      return { extracted_count: 0, memories: [] };
+    }
+    set({ loading: true, error: undefined });
+    try {
+      const resp = await extractFromTextApi({ storyId: currentStoryId, text, model });
+      await get().refreshContext(currentStoryId);
+      set({ loading: false });
+      return resp;
+    } catch (err) {
+      console.error('[memory] extraction failed', err);
+      set({ error: 'Extraction failed', loading: false });
+      return { extracted_count: 0, memories: [] };
+    }
+  },
+
+  deleteMemory: async (memoryId: string) => {
+    const { currentStoryId } = get();
+    if (!currentStoryId) return;
+
+    try {
+      await deleteMemoryApi(currentStoryId, memoryId);
+      // Remove from local state to avoid full refresh
+      set(state => ({
+        context: state.context.filter(m => m.memory_id !== memoryId),
+        results: state.results.filter(m => m.memory_id !== memoryId),
+      }));
+    } catch (err) {
+      console.error('[memory] delete failed', err);
+      set({ error: 'Could not delete memory' });
     }
   },
 

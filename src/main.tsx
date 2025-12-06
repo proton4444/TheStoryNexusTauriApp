@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router";
 import { ThemeProvider } from "./lib/theme-provider";
 import { ToastContainer } from "react-toastify";
 import { StoryProvider } from "@/features/stories/context/StoryContext";
@@ -21,6 +21,7 @@ import LorebookPage from "./features/lorebook/pages/LorebookPage";
 import BrainstormPage from "./features/brainstorm/pages/BrainstormPage";
 import GuidePage from "./features/guide/pages/GuidePage";
 import NotesPage from "./features/notes/pages/NotesPage";
+import MemoriesPage from "./features/memory/pages/MemoriesPage";
 // biome-ignore lint/style/noNonNullAssertion: <explanation>
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -36,8 +37,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route element={<MainLayout />}>
               {/* Stories section */}
               <Route path="/stories" element={<Home />} />
+              {/* Shortcut redirect for prompts */}
+              <Route
+                path="/prompts"
+                element={<Navigate to="/dashboard/c1396115-5af0-4be7-89f4-afb1ebbc7edd/prompts" replace />}
+              />
               {/* AI Settings */}
               <Route path="/ai-settings" element={<AISettingsPage />} />
+              <Route path="/memories" element={<MemoriesPage />} />
               {/* Guide */}
               <Route path="/guide" element={<GuidePage />} />
             </Route>

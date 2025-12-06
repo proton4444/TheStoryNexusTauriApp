@@ -4,6 +4,7 @@ import logging
 import sqlite3
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -19,12 +20,25 @@ class MemoryEntry:
     content: str
     category: Optional[str] = None
     session_id: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 class MemoryBackend:
     def add_memory(
         self, story_id: str, content: str, category: Optional[str], session_id: Optional[str]
     ) -> MemoryEntry:
+        raise NotImplementedError
+
+    def list_memories(
+        self,
+        story_id: Optional[str],
+        query: Optional[str],
+        limit: int,
+        offset: int,
+    ) -> List[MemoryEntry]:
+        raise NotImplementedError
+
+    def count_memories(self, story_id: Optional[str], query: Optional[str]) -> int:
         raise NotImplementedError
 
     def search(self, story_id: str, query: str, limit: int) -> List[MemoryEntry]:
@@ -37,6 +51,16 @@ class MemoryBackend:
         raise NotImplementedError
 
     def clear_all(self) -> None:
+        raise NotImplementedError
+
+    def delete_memory(self, story_id: str, memory_id: str) -> bool:
+        raise NotImplementedError
+
+    def add_memories(self, story_id: str, items: List[dict]) -> List[MemoryEntry]:
+        """
+        Bulk add memories.
+        items: List of dicts with keys 'content', 'category' (optional), 'session_id' (optional).
+        """
         raise NotImplementedError
 
 
@@ -54,9 +78,34 @@ class InMemoryBackend(MemoryBackend):
             content=content,
             category=category,
             session_id=session_id,
+            created_at=datetime.utcnow().isoformat(),
         )
         self._memories.setdefault(story_id, []).append(entry)
         return entry
+
+    def list_memories(
+        self,
+        story_id: Optional[str],
+        query: Optional[str],
+        limit: int,
+        offset: int,
+    ) -> List[MemoryEntry]:
+        if story_id:
+            items = list(self._memories.get(story_id, []))
+        else:
+            items = [entry for entries in self._memories.values() for entry in entries]
+
+        if query:
+            q_lower = query.lower()
+            items = [entry for entry in items if q_lower in entry.content.lower()]
+
+        items = list(reversed(items))
+        return items[offset : offset + limit] if limit > 0 else items[offset:]
+
+    def count_memories(self, story_id: Optional[str], query: Optional[str]) -> int:
+        return len(
+            self.list_memories(story_id=story_id, query=query, limit=10_000_000, offset=0)
+        )
 
     def search(self, story_id: str, query: str, limit: int) -> List[MemoryEntry]:
         items = self._memories.get(story_id, [])
@@ -78,12 +127,36 @@ class InMemoryBackend(MemoryBackend):
     def clear_all(self) -> None:
         self._memories.clear()
 
+    def delete_memory(self, story_id: str, memory_id: str) -> bool:
+        items = self._memories.get(story_id, [])
+        for i, entry in enumerate(items):
+            if entry.memory_id == memory_id:
+                items.pop(i)
+                return True
+        return False
+
+    def add_memories(self, story_id: str, items: List[dict]) -> List[MemoryEntry]:
+        results = []
+        for item in items:
+            entry = self.add_memory(
+                story_id,
+                item["content"],
+                item.get("category"),
+                item.get("session_id"),
+            )
+            results.append(entry)
+        return results
+
 
 class SQLiteBackend(MemoryBackend):
     """Lightweight SQLite-based backend for persistence without ML dependencies."""
 
     def __init__(self, db_path: str = "memori.db") -> None:
-        self.db_path = db_path
+        path = Path(db_path)
+        # Ensure parent directory exists for custom paths
+        if path.parent and not path.parent.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = str(path)
         self._init_db()
 
     def _init_db(self) -> None:
@@ -107,9 +180,29 @@ class SQLiteBackend(MemoryBackend):
     def add_memory(
         self, story_id: str, content: str, category: Optional[str], session_id: Optional[str]
     ) -> MemoryEntry:
-        memory_id = str(uuid.uuid4())
+        # CHECK FOR DUPLICATES
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT memory_id, created_at FROM memories WHERE story_id = ? AND content = ? LIMIT 1",
+            (story_id, content),
+        )
+        existing = cursor.fetchone()
+        
+        if existing:
+            conn.close()
+            logger.info("Duplicate memory found for story %s, skipping insert", story_id)
+            return MemoryEntry(
+                memory_id=existing[0],
+                story_id=story_id,
+                content=content,
+                category=category,
+                session_id=session_id,
+                created_at=existing[1],
+            )
+
+        memory_id = str(uuid.uuid4())
         cursor.execute(
             "INSERT INTO memories (memory_id, story_id, content, category, session_id) VALUES (?, ?, ?, ?, ?)",
             (memory_id, story_id, content, category, session_id),
@@ -129,7 +222,7 @@ class SQLiteBackend(MemoryBackend):
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT memory_id, story_id, content, category, session_id
+            SELECT memory_id, story_id, content, category, session_id, created_at
             FROM memories
             WHERE story_id = ? AND content LIKE ?
             ORDER BY created_at DESC
@@ -146,6 +239,7 @@ class SQLiteBackend(MemoryBackend):
                 content=row[2],
                 category=row[3],
                 session_id=row[4],
+                created_at=row[5] if len(row) > 5 else None,
             )
             for row in rows
         ]
@@ -157,7 +251,7 @@ class SQLiteBackend(MemoryBackend):
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT memory_id, story_id, content, category, session_id
+            SELECT memory_id, story_id, content, category, session_id, created_at
             FROM memories
             WHERE story_id = ?
             ORDER BY created_at DESC
@@ -174,9 +268,79 @@ class SQLiteBackend(MemoryBackend):
                 content=row[2],
                 category=row[3],
                 session_id=row[4],
+                created_at=row[5] if len(row) > 5 else None,
             )
             for row in rows
         ]
+
+    def list_memories(
+        self,
+        story_id: Optional[str],
+        query: Optional[str],
+        limit: int,
+        offset: int,
+    ) -> List[MemoryEntry]:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        base_query = """
+            SELECT memory_id, story_id, content, category, session_id, created_at
+            FROM memories
+        """
+        conditions = []
+        params: list = []
+
+        if story_id:
+            conditions.append("story_id = ?")
+            params.append(story_id)
+        if query:
+            conditions.append("content LIKE ?")
+            params.append(f"%{query}%")
+
+        if conditions:
+            base_query += " WHERE " + " AND ".join(conditions)
+
+        base_query += " ORDER BY datetime(created_at) DESC, rowid DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        cursor.execute(base_query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            MemoryEntry(
+                memory_id=row[0],
+                story_id=row[1],
+                content=row[2],
+                category=row[3],
+                session_id=row[4],
+                created_at=row[5] if len(row) > 5 else None,
+            )
+            for row in rows
+        ]
+
+    def count_memories(self, story_id: Optional[str], query: Optional[str]) -> int:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        count_query = "SELECT COUNT(*) FROM memories"
+        conditions = []
+        params: list = []
+
+        if story_id:
+            conditions.append("story_id = ?")
+            params.append(story_id)
+        if query:
+            conditions.append("content LIKE ?")
+            params.append(f"%{query}%")
+
+        if conditions:
+            count_query += " WHERE " + " AND ".join(conditions)
+
+        cursor.execute(count_query, params)
+        (total,) = cursor.fetchone()
+        conn.close()
+        return int(total or 0)
 
     def clear_story(self, story_id: str) -> int:
         conn = sqlite3.connect(self.db_path)
@@ -193,6 +357,47 @@ class SQLiteBackend(MemoryBackend):
         cursor.execute("DELETE FROM memories")
         conn.commit()
         conn.close()
+
+    def delete_memory(self, story_id: str, memory_id: str) -> bool:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM memories WHERE story_id = ? AND memory_id = ?",
+            (story_id, memory_id),
+        )
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return deleted
+
+    def add_memories(self, story_id: str, items: List[dict]) -> List[MemoryEntry]:
+        results = []
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        for item in items:
+            memory_id = str(uuid.uuid4())
+            content = item["content"]
+            category = item.get("category")
+            session_id = item.get("session_id")
+            
+            cursor.execute(
+                "INSERT INTO memories (memory_id, story_id, content, category, session_id) VALUES (?, ?, ?, ?, ?)",
+                (memory_id, story_id, content, category, session_id),
+            )
+            results.append(
+                MemoryEntry(
+                    memory_id=memory_id,
+                    story_id=story_id,
+                    content=content,
+                    category=category,
+                    session_id=session_id,
+                )
+            )
+            
+        conn.commit()
+        conn.close()
+        return results
 
 
 class MemoriBackend(MemoryBackend):
@@ -274,6 +479,34 @@ class MemoriBackend(MemoryBackend):
     ) -> MemoryEntry:
         entity_id, _process_id = self._ensure_entity_and_process(story_id)
 
+        # CHECK FOR DUPLICATES
+        adapter = self.memori.config.storage.adapter
+        existing = (
+            adapter.execute(
+                """
+                SELECT uuid, content, date_last_time
+                  FROM memori_entity_fact
+                 WHERE entity_id = ?
+                   AND content = ?
+                 LIMIT 1
+                """,
+                (entity_id, content),
+            )
+            .mappings()
+            .fetchone()
+        )
+
+        if existing:
+            logger.info("Duplicate memory found for story %s, skipping insert", story_id)
+            return MemoryEntry(
+                memory_id=existing.get("uuid"),
+                story_id=story_id,
+                content=existing.get("content"),
+                category=category, # Note: Returning request's category/session as we don't store them in Memori fact table directly/reliably for retrieval here easily without mismatch
+                session_id=session_id,
+                created_at=str(existing.get("date_last_time")) if existing.get("date_last_time") else None,
+            )
+
         embeddings = self._embed_texts(content if isinstance(content, list) else [content])
         self.memori.config.storage.driver.entity_fact.create(
             entity_id, [content], fact_embeddings=embeddings
@@ -285,6 +518,7 @@ class MemoriBackend(MemoryBackend):
             content=content,
             category=category,
             session_id=session_id,
+            created_at=datetime.utcnow().isoformat(),
         )
 
     def search(self, story_id: str, query: str, limit: int) -> List[MemoryEntry]:
@@ -294,7 +528,7 @@ class MemoriBackend(MemoryBackend):
             rows = (
                 adapter.execute(
                     """
-                    SELECT uuid, content
+                    SELECT uuid, content, date_last_time
                       FROM memori_entity_fact
                      WHERE entity_id = ?
                        AND content LIKE ?
@@ -313,6 +547,7 @@ class MemoriBackend(MemoryBackend):
                     content=row.get("content", ""),
                     category=None,
                     session_id=None,
+                    created_at=str(row.get("date_last_time")) if row.get("date_last_time") else None,
                 )
                 for row in rows
             ]
@@ -329,40 +564,77 @@ class MemoriBackend(MemoryBackend):
                     content=fact.get("content", ""),
                     category=fact.get("category"),
                     session_id=None,
+                    created_at=str(fact.get("date_last_time"))
+                    if fact.get("date_last_time") is not None
+                    else None,
                 )
             )
         return entries[:limit]
 
     def recent(self, story_id: str, limit: int) -> List[MemoryEntry]:
-        entity_id, _process_id = self._ensure_entity_and_process(story_id)
-        if self.use_stub_embeddings:
-            adapter = self.memori.config.storage.adapter
-            rows = (
-                adapter.execute(
-                    """
-                    SELECT uuid, content
-                      FROM memori_entity_fact
-                     WHERE entity_id = ?
-                     ORDER BY date_last_time DESC
-                     LIMIT ?
-                    """,
-                    (entity_id, limit),
-                )
-                .mappings()
-                .fetchall()
-            )
-            return [
-                MemoryEntry(
-                    memory_id=row.get("uuid") or str(uuid.uuid4()),
-                    story_id=story_id,
-                    content=row.get("content", ""),
-                    category=None,
-                    session_id=None,
-                )
-                for row in rows
-            ]
+        return self.list_memories(story_id=story_id, query=None, limit=limit, offset=0)
 
-        return self.search(story_id, query="", limit=limit)
+    def list_memories(
+        self,
+        story_id: Optional[str],
+        query: Optional[str],
+        limit: int,
+        offset: int,
+    ) -> List[MemoryEntry]:
+        if not story_id:
+            return []
+
+        entity_id, _process_id = self._ensure_entity_and_process(story_id)
+        adapter = self.memori.config.storage.adapter
+
+        conditions = ["entity_id = ?"]
+        params: list = [entity_id]
+
+        if query:
+            conditions.append("content LIKE ?")
+            params.append(f"%{query}%")
+
+        sql = f"""
+            SELECT uuid, content, date_last_time
+              FROM memori_entity_fact
+             WHERE {' AND '.join(conditions)}
+             ORDER BY date_last_time DESC
+             LIMIT ? OFFSET ?
+        """
+        params.extend([limit, offset])
+
+        rows = adapter.execute(sql, params).mappings().fetchall()
+        return [
+            MemoryEntry(
+                memory_id=row.get("uuid") or str(uuid.uuid4()),
+                story_id=story_id,
+                content=row.get("content", ""),
+                category=None,
+                session_id=None,
+                created_at=str(row.get("date_last_time")) if row.get("date_last_time") else None,
+            )
+            for row in rows
+        ]
+
+    def count_memories(self, story_id: Optional[str], query: Optional[str]) -> int:
+        if not story_id:
+            return 0
+
+        entity_id, _process_id = self._ensure_entity_and_process(story_id)
+        adapter = self.memori.config.storage.adapter
+
+        conditions = ["entity_id = ?"]
+        params: list = [entity_id]
+
+        if query:
+            conditions.append("content LIKE ?")
+            params.append(f"%{query}%")
+
+        sql = f"SELECT COUNT(*) as total FROM memori_entity_fact WHERE {' AND '.join(conditions)}"
+        row = adapter.execute(sql, params).fetchone()
+        if not row:
+            return 0
+        return int(row[0] if isinstance(row, tuple) else row.get("total", 0))
 
     def clear_story(self, story_id: str) -> int:
         driver = self.memori.config.storage.driver
@@ -381,11 +653,51 @@ class MemoriBackend(MemoryBackend):
         adapter.execute("DELETE FROM memori_entity_fact")
         adapter.commit()
 
+    def delete_memory(self, story_id: str, memory_id: str) -> bool:
+        adapter = self.memori.config.storage.adapter
+        # Ensure ID is clean
+        clean_id = memory_id.strip()
+        cursor = adapter.execute("DELETE FROM memori_entity_fact WHERE uuid = ?", (clean_id,))
+        adapter.commit()
+        # Rowcount might be unreliable in some adapters, assume success if no error
+        return True
+
+    def add_memories(self, story_id: str, items: List[dict]) -> List[MemoryEntry]:
+        if not items:
+            return []
+            
+        entity_id, _process_id = self._ensure_entity_and_process(story_id)
+        contents = [item["content"] for item in items]
+        
+        # Batch embed
+        embeddings = self._embed_texts(contents)
+        driver_ent_fact = self.memori.config.storage.driver.entity_fact
+        
+        results = []
+        for i, content in enumerate(contents):
+            # Insert one by one to ensure we process each
+            driver_ent_fact.create(entity_id, [content], fact_embeddings=[embeddings[i]])
+            
+            results.append(
+                MemoryEntry(
+                    memory_id=str(uuid.uuid4()), # Still fake ID as per existing pattern
+                    story_id=story_id,
+                    content=content,
+                    category=items[i].get("category"),
+                    session_id=items[i].get("session_id"),
+                )
+            )
+        return results
+
 
 def select_backend(settings: Settings) -> MemoryBackend:
     if settings.backend == "sqlite":
-        logger.info("Initializing SQLite backend at %s", settings.memori_db_path)
-        return SQLiteBackend(settings.memori_db_path)
+        try:
+            logger.info("Initializing SQLite backend at %s", settings.memori_db_path)
+            return SQLiteBackend(settings.memori_db_path)
+        except Exception as exc:
+            logger.warning("SQLite backend failed (%s). Falling back to in-memory backend.", exc)
+            return InMemoryBackend()
     if settings.backend == "memori":
         try:
             logger.info("Initializing Memori backend with SQLite at %s", settings.memori_db_path)
@@ -393,4 +705,3 @@ def select_backend(settings: Settings) -> MemoryBackend:
         except Exception as exc:
             logger.warning("Falling back to stub backend: %s", exc)
     return InMemoryBackend()
-

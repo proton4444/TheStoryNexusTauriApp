@@ -8,6 +8,8 @@ import { useMemoryStore } from "../store/useMemoryStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LorebookImportSummary } from "./LorebookImportSummary";
 import { MemoryCategoryCloud } from "./MemoryCategoryCloud";
+import { ContextViewer } from "./ContextViewer";
+import { useAIStore } from "@/features/ai/stores/useAIStore";
 
 type Props = {
   storyId: string;
@@ -28,11 +30,15 @@ export function MemoryPanel({ storyId }: Props) {
     refreshContext,
     addMemory,
     importLorebook,
+    deleteMemory,
     checkHealth,
     setCurrentStory,
+    extractFromText,
   } = useMemoryStore();
+  const { lastInjectedContext, lastExtractedEntities, settings, isInitialized, initialize: initializeAI } = useAIStore();
   const [draft, setDraft] = useState("");
   const [category, setCategory] = useState("");
+  const [extractionText, setExtractionText] = useState("");
   const [showStats, setShowStats] = useState(false);
 
   // Check health and set current story on mount
@@ -40,6 +46,12 @@ export function MemoryPanel({ storyId }: Props) {
     checkHealth();
     setCurrentStory(storyId);
   }, [checkHealth, setCurrentStory, storyId]);
+
+  useEffect(() => {
+    if (!isInitialized) {
+      initializeAI();
+    }
+  }, [isInitialized, initializeAI]);
 
   useEffect(() => {
     refreshContext(storyId);
@@ -52,8 +64,36 @@ export function MemoryPanel({ storyId }: Props) {
 
   const handleAddMemory = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addMemory(draft, category || undefined, storyId);
+    await addMemory(draft, category || undefined);
     setDraft("");
+  };
+
+  const handleExtract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extractionText.trim()) return;
+
+    // Optimistic UI update or loading state is handled by store 'loading'
+    try {
+      console.log("Requesting extraction for:", extractionText);
+
+      // Use the selected default model from settings, or let backend use its default
+      const modelId = settings?.defaultModel?.id;
+      const result = await extractFromText(extractionText, modelId);
+      console.log("Extraction API result:", result);
+
+      if (result.extracted_count > 0) {
+        setExtractionText("");
+
+        // Update AI store so ContextViewer shows the new entities
+        const formattedEntities = result.memories.map(m => `${m.category}: ${m.content}`);
+        useAIStore.setState({ lastExtractedEntities: formattedEntities });
+      } else {
+        console.warn("Extraction returned 0 entities.");
+        // Optional: show error state in UI or just keep text
+      }
+    } catch (e) {
+      console.error("Extraction error:", e);
+    }
   };
 
   return (
@@ -101,6 +141,11 @@ export function MemoryPanel({ storyId }: Props) {
             </div>
           </form>
 
+          <ContextViewer
+            injectedContext={lastInjectedContext}
+            extractedEntities={lastExtractedEntities}
+          />
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -122,13 +167,22 @@ export function MemoryPanel({ storyId }: Props) {
               ) : (
                 <ul className="space-y-2">
                   {context.map((item) => (
-                    <li key={item.memory_id} className="text-sm">
+                    <li key={item.memory_id} className="text-sm flex items-start justify-between gap-2 group">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="capitalize">
                           {item.category || "note"}
                         </Badge>
                         <span className="text-left">{item.content}</span>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        onClick={() => deleteMemory(item.memory_id)}
+                        title="Delete memory"
+                      >
+                        <span className="text-xs">×</span>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -147,13 +201,22 @@ export function MemoryPanel({ storyId }: Props) {
               ) : (
                 <ul className="space-y-2">
                   {results.map((item) => (
-                    <li key={item.memory_id} className="text-sm">
+                    <li key={item.memory_id} className="text-sm flex items-start justify-between gap-2 group">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="capitalize">
                           {item.category || "note"}
                         </Badge>
                         <span className="text-left">{item.content}</span>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        onClick={() => deleteMemory(item.memory_id)}
+                        title="Delete memory"
+                      >
+                        <span className="text-xs">×</span>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -190,6 +253,22 @@ export function MemoryPanel({ storyId }: Props) {
               {importing ? "Importing..." : "Import lorebook entries"}
             </Button>
             {lastImported !== null && <LorebookImportSummary count={lastImported} />}
+          </div>
+
+          <div className="space-y-2 border rounded p-2">
+            <p className="text-sm font-medium">Extract Entities from Text</p>
+            <form className="space-y-2" onSubmit={handleExtract}>
+              <Textarea
+                itemID="extraction-input"
+                placeholder="Paste text here to automatically extract characters, locations, etc."
+                value={extractionText}
+                onChange={(e) => setExtractionText(e.target.value)}
+                rows={3}
+              />
+              <Button type="submit" disabled={loading || !extractionText.trim()}>
+                Extract Entities
+              </Button>
+            </form>
           </div>
 
           {showStats && (

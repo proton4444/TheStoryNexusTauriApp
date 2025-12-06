@@ -4,7 +4,7 @@ import { useLorebookStore } from "../stores/useLorebookStore";
 import { CreateEntryDialog } from "../components/CreateEntryDialog";
 import { LorebookEntryList } from "../components/LorebookEntryList";
 import { Button } from "@/components/ui/button";
-import { Plus, Download, Upload } from "lucide-react";
+import { Plus, Download, Upload, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -19,10 +19,13 @@ export default function LorebookPage() {
         error,
         buildTagMap,
         exportEntries,
-        importEntries
+        importEntries,
+        importTextEntry,
+        autoExtractFromStory,
     } = useLorebookStore();
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState("all");
+    const [isExtracting, setIsExtracting] = useState(false);
 
     useEffect(() => {
         if (storyId) {
@@ -64,11 +67,17 @@ export default function LorebookPage() {
         reader.onload = async (e) => {
             try {
                 const content = e.target?.result as string;
-                await importEntries(content, storyId);
-                // Reload entries after import
-                await loadEntries(storyId);
-                buildTagMap();
-                toast.success("Lorebook entries imported successfully");
+                const ext = (file.name.split(".").pop() || "").toLowerCase();
+                if (ext === "txt" || ext === "md") {
+                    await importTextEntry(file.name, content, storyId);
+                    toast.success("Imported text file into lorebook");
+                } else {
+                    await importEntries(content, storyId);
+                    // Reload entries after import
+                    await loadEntries(storyId);
+                    buildTagMap();
+                    toast.success("Lorebook entries imported successfully");
+                }
             } catch (error) {
                 console.error("Import failed:", error);
                 toast.error("Failed to import lorebook entries");
@@ -124,13 +133,36 @@ export default function LorebookPage() {
                     <input
                         id="import-lorebook"
                         type="file"
-                        accept=".json"
+                        accept=".json,.txt,.md"
                         className="hidden"
                         onChange={handleImport}
                     />
                     <Button onClick={() => setIsCreateDialogOpen(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         New Entry
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        disabled={!storyId || isExtracting}
+                        onClick={async () => {
+                            if (!storyId) return;
+                            setIsExtracting(true);
+                            try {
+                                const added = await autoExtractFromStory(storyId);
+                                if (added > 0) {
+                                    toast.success(`Extracted ${added} lorebook entr${added === 1 ? "y" : "ies"} from story`);
+                                } else {
+                                    toast.info("No new lorebook entries found to extract");
+                                }
+                            } catch (err) {
+                                toast.error("Auto-extract failed");
+                            } finally {
+                                setIsExtracting(false);
+                            }
+                        }}
+                    >
+                        <Wand2 className={`w-4 h-4 mr-2 ${isExtracting ? "animate-spin" : ""}`} />
+                        Auto-extract
                     </Button>
                 </div>
             </div>

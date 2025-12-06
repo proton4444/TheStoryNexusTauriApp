@@ -17,7 +17,8 @@ import {
     Plus,
     Edit,
     Trash2,
-    ExternalLink
+    ExternalLink,
+    Wand2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -302,6 +303,32 @@ export default function LorebookGuide() {
                                     Create entries for all major characters, locations, and important story elements before you start writing. This will ensure the AI has a good understanding of your story world from the beginning.
                                 </AlertDescription>
                             </Alert>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t">
+                            <h3 className="text-xl font-semibold mb-4">Method 2: Auto-Extract from Story</h3>
+                            <p className="mb-4">
+                                If you have already written chapters, you can use AI to automatically scan your text and create Lorebook entries for characters, locations, and items.
+                            </p>
+
+                            <div className="space-y-4 border-l-4 border-secondary pl-4 py-2">
+                                <h4 className="text-lg font-medium">How to use Auto-Extract</h4>
+                                <ol className="list-decimal list-inside space-y-2 ml-4">
+                                    <li>Navigate to the **Lorebook** page.</li>
+                                    <li>Click the **Auto-extract** button (Wand icon) in the top-right toolbar.</li>
+                                    <li>The system will analyze all chapters in your story.</li>
+                                    <li>New entries will be automatically created for detected entities.</li>
+                                </ol>
+                                <div className="flex items-center gap-2 my-2">
+                                    <Badge variant="secondary" className="gap-1">
+                                        <Wand2 className="h-3 w-3" />
+                                        Auto-extract
+                                    </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    Note: This process avoids creating duplicate entries if an entry with the same name already exists.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </TabsContent>

@@ -1,0 +1,183 @@
+﻿
+================================================================================
+MEMORY DATABASE: memori.db
+Total memories: 154
+================================================================================
+
+
+≡ƒôû STORY: 13c31f4e-908b-4dc3-8d61-dff5e4def448
+   Memories: 66
+----------------------------------------------------------------------
+   [character   ] Sir Galahad: clad in gleaming armor etched with runes of purity, a knight standi...
+   [character   ] Scorchfang: the elder wyrm with blackened obsidian scales veined with molten gol...
+   [character   ] Valiant: Sir Galahad's loyal destrier that whinnies nervously
+   [location    ] Crystal Lake: mist-shrouded waters reflecting the dying light of the setting sun...
+   [item        ] Stormlicer: Sir Galahad's sword, Excalibur's lesser kin, humming in his grip
+   [item        ] Galahad's armor: gleaming armor etched with runes of purity
+   [ingest      ] Provider: unknown | Model: x-ai/grok-code-fast-1 | Injected: 6  Prompt: system: ...
+   [completion  ] Below is a short scene I've crafted based on your prompt. I drew from classic kn...
+   [ingest      ] Provider: openrouter | Model: x-ai/grok-code-fast-1 | Injected: 6  Prompt: syste...
+   [character   ] Gandalf the Grey: wizard with wide-brimmed hat, staff, and pipe trudging through...
+   [character   ] Warg: snarling beast with glowing eyes, bared fangs, and matted fur
+   [location    ] Mirkwood: shadowed eaves with twisted branches clawing at moonlit sky and mossy ...
+   [location    ] Forgotten path: path in Mirkwood where Gandalf trudges
+   [item        ] Wide-brimmed hat: dusted with spores of ancient fungi
+   [item        ] Staff: Gandalf's staff that taps earth sending sparks and erupts flames with spe...
+   [item        ] Pipe: unlit pipe from which Gandalf exhales pipe-weed smoke
+   [item        ] Pipe-weed: smoke exhaled by Gandalf
+   [fact        ] Gandalf says 'You shall not pass' to the warg
+   [fact        ] Gandalf casts 'Naur an edraith ammen!' creating flames that engulf the warg
+   [fact        ] Warg lunges at Gandalf but crumbles to ash
+   [fact        ] Gandalf chuckles 'Foolish beast' after defeating the warg
+   [fact        ] Shadows grow bold but light endures as Gandalf presses on at dawn
+   [completion  ] ### The Grey Wanderer  In the shadowed eaves of the Mirkwood, where twisted bran...
+   [ingest      ] Provider: openrouter | Model: x-ai/grok-4.1-fast | Injected: 3  Prompt: Write a ...
+   [note        ] adWe've removed the Opus cap so you can use Opus 4.5 up to your overall limit. Y...
+   [fact        ] Aragorn is the rightful king of Gondor
+   [factfact    ] Aragorn is the rightful king of GondorAragorn is the rightful king of Gondor
+   [character   ] Poseidon: a figure mentioned in the text
+   [fact        ] This is a debug test with Poseidon.
+   [character   ] Apollo: entity used in testing model override
+   [fact        ] Testing model override with Apollo
+   [fact        ] Testing model override with Apollo
+   [character   ] Zeus: God
+   [character   ] Hermes: God
+   [location    ] Mount Olympus: A mountain
+   [item        ] master bolt: Weapon of Zeus
+   [character   ] Oracle of Delphi: A person who can tell the future.
+   [location    ] Delphi: A place; Troy: A place.
+   [fact        ] The Oracle of Delphi predicted the fall of Troy
+   [character   ] Gandalf the Grey: Unknown
+   [character   ] Captain Nexus: Captain of the Starship Eternity
+   [location    ] Nebula of Lost Souls: A nebula
+   [item        ] Starship Eternity: A spaceship
+   [item        ] Chrono-Key: An ancient artifact
+   [character   ] Smaug: ancient dragon
+   [location    ] Lonely Mountain: location guarding gold
+   [item        ] gold: guarded by Smaug
+   [fact        ] Smaug slept in the Lonely Mountain.
+   [character   ] Gandalf: wizard
+   [location    ] Minas Tirith: city
+
+≡ƒôû STORY: test123
+   Memories: 30
+----------------------------------------------------------------------
+   [character   ] Sir Lancelot du Lac: Born of noble blood in Benwick or Gaul, raised by Viviane i...
+   [character   ] Viviane, Lady of the Lake: Enchantress who raised Lancelot in her mystical under...
+   [character   ] King Arthur: King whose court was in Camelot, knighted Lancelot and seated him a...
+   [character   ] Queen Guinevere: King Arthur's wife, Lancelot's forbidden love
+   [character   ] Sir Agravaine: Jealous knight who spread whispers of treason
+   [character   ] Mordred: Treacherous figure who fueled rumors of treason
+   [location    ] Benwick: Ancient kingdom of Lancelot's birth
+   [location    ] Gaul: Alternative kingdom of Lancelot's birth
+   [location    ] Underwater realm: Mystical domain of Lady of the Lake where Lancelot was raised
+   [location    ] Camelot: Site of King Arthur's court, tournaments, and Round Table
+   [location    ] Corbin: Location of a dragon slain by Lancelot
+   [item        ] Holy Grail: Sacred chalice of Christ, quested for by Lancelot
+   [item        ] Armor: Gleaming like polished silver, worn by Lancelot
+   [item        ] Lance: Unerringly true, used by Lancelot in tournaments
+   [item        ] Siege Perilous: Foretold seat at Round Table for the purest soul, first sat in b...
+   [item        ] Banner: Silver stag on azure field, Lancelot's banner
+   [fact        ] Lancelot was spirited away by Viviane from infancy and raised in her underwater ...
+   [fact        ] Lancelot proved his mettle in Camelot tournaments, unhorsing knights
+   [fact        ] Lancelot was knighted by Arthur and became the first to sit in the Siege Perilou...
+   [fact        ] Lancelot quested for the Holy Grail but was barred by his mortal sins
+   [fact        ] Lancelot slew the dragon of Corbin and rescued damsels from sorcerers
+   [fact        ] Lancelot fought off a hundred knights to defend a castle
+   [fact        ] Lancelot's love for Guinevere led to whispers of treason by Agravaine and Mordre...
+   [fact        ] Lancelot slew Round Table knights to escape with Guinevere, shattering the fello...
+   [fact        ] Lancelot was exiled and waged war against Arthur's forces
+   [completion  ] ### Sir Lancelot: The Knight of Unmatched Valor and Forbidden Love  In the misty...
+   [ingest      ] Provider: openrouter | Model: x-ai/grok-4.1-fast | Injected: 3  Prompt: Write ab...
+   [character   ] Heracles: strength
+   [character   ] Athena: wisdom
+   [character   ] Prometheus: the one who stole fire
+
+≡ƒôû STORY: test-story
+   Memories: 17
+----------------------------------------------------------------------
+   [completion  ] [stub-llm] Alice ventured into the Dark Forest with her magical sword Excalibur.
+   [ingest      ] Provider: stub | Model: gpt-4o-mini | Injected: 3  Prompt: Alice ventured into t...
+   [character   ] Alice: A character
+   [character   ] Dark Forest: A character
+   [character   ] Excalibur: A character
+   [location    ] Dark Forest: A location
+   [completion  ] [stub-llm] Tell me about the hero Alice and her quest in the Dark Forest
+   [ingest      ] Provider: stub | Model: gpt-4o-mini | Injected: 3  Prompt: Tell me about the her...
+   [character   ] Tell: A character
+   [character   ] Alice: A character
+   [character   ] Dark Forest: A character
+   [location    ] Dark Forest: A location
+   [character   ] Alice: A character
+   [character   ] Dark Forest: A character
+   [character   ] Shadow: A character
+   [location    ] Dark Forest: A location
+   [fact        ] Alice found a golden key in the Dark Forest while running from the Shadow.
+
+≡ƒôû STORY: new-test
+   Memories: 12
+----------------------------------------------------------------------
+   [completion  ] [stub-llm] Elena found a sword
+   [ingest      ] Provider: stub | Model: gpt-4o-mini | Injected: 3  Prompt: Elena found a sword  ...
+   [character   ] Elena: A character
+   [completion  ] [stub-llm] Princess Elena found the Crystal Sword in Castle Moonhaven
+   [ingest      ] Provider: stub | Model: gpt-4o-mini | Injected: 0  Prompt: Princess Elena found ...
+   [character   ] Princess Elena: A character
+   [character   ] Crystal Sword: A character
+   [character   ] Castle Moonhaven: A character
+   [location    ] Princess Elena: A location
+   [location    ] Crystal Sword: A location
+   [location    ] Castle Moonhaven: A location
+   [item        ] Crystal Sword: An item
+
+≡ƒôû STORY: f060e2be-3539-459c-bdfe-63c0448fa93e
+   Memories: 8
+----------------------------------------------------------------------
+   [character   ] Ten: A character
+   [character   ] Chapter: A character
+   [character   ] The Sound: A character
+   [location    ] The Sound: A location
+   [location    ] Submission Naruto The: A location
+   [location    ] Sakura Haruno: A location
+   [fact        ] The arena shimmered, a nexus point where dimensions blurred and the rules of rea...
+   [note        ] The arena shimmered, a nexus point where dimensions blurred and the rules of rea...
+
+≡ƒôû STORY: test2
+   Memories: 7
+----------------------------------------------------------------------
+   [character   ] Captain Marcus: Leader of the Silver Knights
+   [character   ] Dragon Lord: Enemy in the Battle of Frozen Peak
+   [location    ] Frozen Peak: Location of a battle
+   [item        ] Shield of Dawn: Enchanted shield
+   [fact        ] The Silver Knights fought against the Dragon Lord.
+   [fact        ] Captain Marcus led the Silver Knights.
+   [fact        ] The Shield of Dawn provides protection from fire.
+
+≡ƒôû STORY: demo
+   Memories: 5
+----------------------------------------------------------------------
+   [character   ] Alice: The protagonist who discovers the map
+   [location    ] Whispering Woods: The location where Alice finds the map
+   [location    ] Lost Temple: The location where the Moonstone is hidden
+   [item        ] ancient map: A map leading to the Lost Temple
+   [item        ] Moonstone: A legendary item hidden in the Lost Temple
+
+≡ƒôû STORY: test
+   Memories: 5
+----------------------------------------------------------------------
+   [item        ] Crystal Sword: Item found by Princess Elena in Castle Moonhaven
+   [fact        ] Princess Elena found the Crystal Sword.
+   [character   ] Princess Elena: Main character, fleeing from the Shadow King
+   [character   ] Shadow King: Antagonist, pursuing Princess Elena
+   [location    ] Castle Moonhaven: Location where Princess Elena found the Crystal Sword
+
+≡ƒôû STORY: c1396115-5af0-4be7-89f4-afb1ebbc7edd
+   Memories: 4
+----------------------------------------------------------------------
+   [fact        ] A Reddit post describes someone trying to create 100 Gmail accounts to power-lev...
+   [fact        ] The person hits Google's phone-number limit.
+   [fact        ] Top answers say it's not really possible to do that with one phone.
+   [fact        ] Top answers also say that 100 real accounts aren't needed, and to use Gmail alia...
+
+================================================================================
+

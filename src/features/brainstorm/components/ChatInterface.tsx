@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Send, ChevronDown, ChevronUp, X, Plus, Square, Edit } from "lucide-react";
 import {
@@ -92,6 +93,10 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
     generateWithMemoryPrompt,
     processStreamedResponse,
     abortGeneration,
+    useMemory: useMemoryFlow,
+    setUseMemory: setUseMemoryFlow,
+    injectLimit,
+    setInjectLimit,
   } = useAIStore();
   const {
     addChat,
@@ -151,8 +156,7 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
 
   // State for selected lorebook items
   const [selectedItems, setSelectedItems] = useState<LorebookEntry[]>([]);
-  // Memory-aware generation toggle
-  const [useMemoryFlow, setUseMemoryFlow] = useState(true);
+
 
   // Initialize
   useEffect(() => {
@@ -230,7 +234,7 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
     selectedSummaries.length > 0 || selectedItems.length > 0;
 
   const toggleMemoryFlow = () => {
-    setUseMemoryFlow((prev) => !prev);
+    setUseMemoryFlow(!useMemoryFlow);
   };
 
   // Toggle full context
@@ -300,6 +304,7 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
         selectedChapterContent: includeFullContext
           ? []
           : selectedChapterContent,
+        selectedText: input.trim(),
       },
     };
   };
@@ -412,19 +417,25 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
 
       const config = createPromptConfig(selectedPrompt);
       if (useMemoryFlow) {
-        const memoriResult = await generateWithMemoryPrompt(config, storyId);
-        if (memoriResult) {
-          const assistantMessage: ChatMessage = {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: memoriResult.completion,
-            timestamp: new Date(),
-          };
-          const updatedMessages = [...newMessages, assistantMessage];
-          setMessages(updatedMessages);
-          await updateChat(chatId, { messages: updatedMessages });
-          setIsGenerating(false);
-          return;
+        try {
+          const memoriResult = await generateWithMemoryPrompt(config, storyId);
+          if (memoriResult) {
+            const assistantMessage: ChatMessage = {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: memoriResult.completion,
+              timestamp: new Date(),
+            };
+            const updatedMessages = [...newMessages, assistantMessage];
+            setMessages(updatedMessages);
+            await updateChat(chatId, { messages: updatedMessages });
+            setIsGenerating(false);
+            return;
+          }
+        } catch (memError) {
+          console.warn('[ChatInterface] Memory flow failed, falling back to regular generation:', memError);
+          toast.warn(memError instanceof Error ? memError.message : 'Memory flow failed, trying regular generation...');
+          // Fall through to regular generation
         }
       }
 
@@ -648,92 +659,91 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
                 const hasParsableJson = !parsed.error && parsed.entries && parsed.entries.length > 0;
 
                 return (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
                   <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
-                      message.role === "user"
+                    key={message.id}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg p-3 ${message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
-                    }`}
-                  >
-                    {editingMessageId === message.id ? (
-                      <div>
-                        <Textarea
-                          ref={(el: HTMLTextAreaElement) => (editingTextareaRef.current = el)}
-                          value={editingContent}
-                          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                            const newVal = e.target.value;
-                            setEditingContent(newVal);
-                            // Autosize editor textarea
-                            try {
-                              const ta = editingTextareaRef.current;
-                              if (ta) {
-                                ta.style.height = 'auto';
-                                const contentHeight = ta.scrollHeight;
-                                const newHeight = Math.min(Math.max(contentHeight, INITIAL_TEXTAREA_HEIGHT), MAX_TEXTAREA_HEIGHT);
-                                ta.style.height = `${newHeight}px`;
-                                ta.style.overflowY = contentHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden';
+                        }`}
+                    >
+                      {editingMessageId === message.id ? (
+                        <div>
+                          <Textarea
+                            ref={(el: HTMLTextAreaElement) => (editingTextareaRef.current = el)}
+                            value={editingContent}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                              const newVal = e.target.value;
+                              setEditingContent(newVal);
+                              // Autosize editor textarea
+                              try {
+                                const ta = editingTextareaRef.current;
+                                if (ta) {
+                                  ta.style.height = 'auto';
+                                  const contentHeight = ta.scrollHeight;
+                                  const newHeight = Math.min(Math.max(contentHeight, INITIAL_TEXTAREA_HEIGHT), MAX_TEXTAREA_HEIGHT);
+                                  ta.style.height = `${newHeight}px`;
+                                  ta.style.overflowY = contentHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden';
+                                }
+                              } catch (err) {
+                                // ignore
                               }
-                            } catch (err) {
-                              // ignore
-                            }
-                          }}
-                          className="min-h-[80px] max-h-[330px] md:min-w-[520px]"
-                          onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                              e.preventDefault();
-                              // Save
-                              handleSaveEdit(message.id);
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setEditingMessageId(null);
-                              setEditingContent('');
-                            }
-                          }}
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <Button size="sm" onClick={() => handleSaveEdit(message.id)}>Save</Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingMessageId(null); setEditingContent(''); }}>Cancel</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <MarkdownRenderer
-                          content={message.content}
-                          showDelete={true}
-                          onDelete={() => handleDeleteMessage(message.id)}
-                          onEdit={() => {
-                            if (streamingMessageId === message.id) {
-                              if (!confirm('This message is still being generated. Stop generation and edit?')) return;
-                              abortGeneration();
-                              setStreamingMessageId(null);
-                            }
-                            setEditingMessageId(message.id);
-                            setEditingContent(message.content);
-                          }}
-                        />
-
-                        {/* Extract button for parsed JSON -> lorebook entry */}
-                        {message.role === 'assistant' && hasParsableJson && (
-                          <div className="absolute bottom-2 right-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleExtractFromMessage(message.content)}
-                              disabled={streamingMessageId === message.id}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
+                            }}
+                            className="min-h-[80px] max-h-[330px] md:min-w-[520px]"
+                            onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                e.preventDefault();
+                                // Save
+                                handleSaveEdit(message.id);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setEditingMessageId(null);
+                                setEditingContent('');
+                              }
+                            }}
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <Button size="sm" onClick={() => handleSaveEdit(message.id)}>Save</Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingMessageId(null); setEditingContent(''); }}>Cancel</Button>
                           </div>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <MarkdownRenderer
+                            content={message.content}
+                            showDelete={true}
+                            onDelete={() => handleDeleteMessage(message.id)}
+                            onEdit={() => {
+                              if (streamingMessageId === message.id) {
+                                if (!confirm('This message is still being generated. Stop generation and edit?')) return;
+                                abortGeneration();
+                                setStreamingMessageId(null);
+                              }
+                              setEditingMessageId(message.id);
+                              setEditingContent(message.content);
+                            }}
+                          />
+
+                          {/* Extract button for parsed JSON -> lorebook entry */}
+                          {message.role === 'assistant' && hasParsableJson && (
+                            <div className="absolute bottom-2 right-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleExtractFromMessage(message.content)}
+                                disabled={streamingMessageId === message.id}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
+                );
               })}
               <div ref={messagesEndRef} />
             </div>
@@ -790,6 +800,19 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
                 </>
               )}
               <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Use Memory</span>
+                  <div className="relative group">
+                    <Switch
+                      checked={useMemoryFlow}
+                      onCheckedChange={setUseMemoryFlow}
+                      className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
+                    />
+                    <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity">
+                      Enable Retrieval-Augmented Generation to inject relevant memories
+                    </div>
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">Full Context</span>
                   <div className="relative group">
@@ -1100,10 +1123,23 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
 
       {/* Input area */}
       <div className="border-t p-4">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Switch checked={useMemoryFlow} onCheckedChange={toggleMemoryFlow} />
-            <span>Use memory sidecar</span>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Switch checked={useMemoryFlow} onCheckedChange={toggleMemoryFlow} />
+              <span>Use memory sidecar</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>Inject limit</span>
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={injectLimit}
+                onChange={(e) => setInjectLimit(Number(e.target.value) || 1)}
+                className="w-16 h-8 text-sm"
+              />
+            </div>
           </div>
           <div className="flex-1">
             <Textarea
@@ -1125,7 +1161,7 @@ export default function ChatInterface({ storyId }: ChatInterfaceProps) {
               isLoading={promptsLoading}
               error={promptsError}
               prompts={prompts}
-              promptType="brainstorm"
+              promptType={["brainstorm", "selection_specific"]}
               selectedPrompt={selectedPrompt}
               selectedModel={selectedModel}
               onSelect={handlePromptSelect}

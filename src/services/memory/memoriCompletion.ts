@@ -6,6 +6,8 @@ type Request = {
   temperature: number;
   maxTokens: number;
   storyId: string;
+  model?: string;
+  injectLimit?: number;
 };
 
 export async function memoriCompletion(req: Request): Promise<CompletionResponse> {
@@ -13,6 +15,9 @@ export async function memoriCompletion(req: Request): Promise<CompletionResponse
   return completeWithMemory({
     prompt: promptText,
     storyId: req.storyId,
-    injectLimit: 3,
+    injectLimit: req.injectLimit ?? 3,
+    model: req.model,
+    maxTokens: req.maxTokens,
+    temperature: req.temperature,
   });
 }

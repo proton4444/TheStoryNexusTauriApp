@@ -12,6 +12,8 @@ export function ThemeToggle({ isExpanded = false }: ThemeToggleProps) {
 
     return (
         <Button
+            id="theme-toggle-button"
+            data-testid="theme-toggle-button"
             variant="ghost"
             size={isExpanded ? "default" : "icon"}
             className={cn(

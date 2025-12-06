@@ -26,24 +26,25 @@ class CompletionClient:
     def __init__(self, config: LlmConfig):
         self.config = config
 
-    async def complete(self, prompt: str) -> str:
+    async def complete(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
         provider = self.config.provider
         if provider == "stub":
             return f"[stub-llm] {prompt}"
         if provider == "local":
-            return await self._complete_local(prompt)
+            return await self._complete_local(prompt, max_tokens=max_tokens, temperature=temperature)
         if provider == "openai":
-            return await self._complete_openai(prompt)
+            return await self._complete_openai(prompt, max_tokens=max_tokens, temperature=temperature)
         if provider == "openrouter":
-            return await self._complete_openrouter(prompt)
+            return await self._complete_openrouter(prompt, max_tokens=max_tokens, temperature=temperature)
         raise ValueError(f"Unsupported provider: {provider}")
 
-    async def _complete_local(self, prompt: str) -> str:
+    async def _complete_local(self, prompt: str, max_tokens: int, temperature: float) -> str:
         url = f"{self.config.local_api_url}/chat/completions"
         payload = {
             "model": self.config.model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 512,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
         }
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(url, json=payload)
@@ -51,7 +52,7 @@ class CompletionClient:
             data = resp.json()
             return data["choices"][0]["message"]["content"]
 
-    async def _complete_openai(self, prompt: str) -> str:
+    async def _complete_openai(self, prompt: str, max_tokens: int, temperature: float) -> str:
         import openai
 
         api_key = self.config.openai_api_key or os.environ.get("OPENAI_API_KEY")
@@ -62,11 +63,12 @@ class CompletionClient:
         resp = await client.chat.completions.create(
             model=self.config.model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=512,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         return resp.choices[0].message.content or ""
 
-    async def _complete_openrouter(self, prompt: str) -> str:
+    async def _complete_openrouter(self, prompt: str, max_tokens: int, temperature: float) -> str:
         import openai
 
         api_key = self.config.openrouter_api_key or os.environ.get(
@@ -81,6 +83,7 @@ class CompletionClient:
         resp = await client.chat.completions.create(
             model=self.config.model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=512,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         return resp.choices[0].message.content or ""

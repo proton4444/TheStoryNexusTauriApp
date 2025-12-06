@@ -65,8 +65,9 @@ class CompletionRequest(BaseModel):
     session_id: Optional[str] = None
     inject_limit: int = Field(default=3, ge=0, le=50)
     model: Optional[str] = None
-    max_tokens: Optional[int] = Field(default=None, ge=1, le=8192)
-    max_context_tokens: int = Field(default=2000, ge=100, le=32000)
+    max_tokens: Optional[int] = Field(default=512, ge=1, le=8192)
+    temperature: Optional[float] = Field(default=0.7, ge=0, le=2.0)
+    max_context_tokens: int = Field(default=2000, ge=100, le=8000)
 
 
 class CompletionResponse(BaseModel):
@@ -285,7 +286,10 @@ Text:
         
         try:
             llm_client = get_llm_client(model)
+            print(f"DEBUG_EXTRACT: Sending extraction request. Text len: {len(text)}", flush=True)
             llm_response = await llm_client.complete(extraction_prompt)
+            print(f"DEBUG_EXTRACT: LLM response: {llm_response}", flush=True)
+            
             response_text = llm_response.strip()
             start_idx = response_text.find("{")
             end_idx = response_text.rfind("}") + 1
@@ -545,7 +549,7 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
         budget = payload.max_context_tokens
         kept_memories = []
         
-        # Prioritize keeping the most recent/relevant ones (they are already sorted/deduped)
+        # Prioritize keeping the most recent/relevant ones (already sorted/deduped)
         for mem in injected:
             est_tokens = len(mem) // 4 + 2  # +2 for bullet point overhead
             if current_context_tokens + est_tokens > budget:
@@ -559,13 +563,18 @@ async def completion(payload: CompletionRequest) -> CompletionResponse:
                 f"Here is some relevant context from the story:\n{context_block}\n\n"
                 f"Use the above context if relevant to answer or continue the following:\n{payload.prompt}"
             )
+            injected = kept_memories  # reflect what was actually injected
             logger.info("Injected %d memories (~%d tokens)", len(kept_memories), current_context_tokens)
         else:
             logger.info("Context budget too small, dropped all %d memories", len(injected))
 
     llm_client = get_llm_client(chosen_model)
     try:
-        completion_text = await llm_client.complete(augmented_prompt)
+        completion_text = await llm_client.complete(
+            augmented_prompt,
+            max_tokens=payload.max_tokens or 512,
+            temperature=payload.temperature or 0.7,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - runtime failure path

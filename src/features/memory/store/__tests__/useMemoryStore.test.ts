@@ -7,6 +7,8 @@ vi.mock("@/services/memory/memoryService", () => ({
     getContext: vi.fn(),
     searchMemories: vi.fn(),
     addMemory: vi.fn(),
+    addMemories: vi.fn(),
+    health: vi.fn().mockResolvedValue("ok"),
 }));
 
 // Mock the database
@@ -151,8 +153,13 @@ describe("useMemoryStore", () => {
 
             const { result } = renderHook(() => useMemoryStore());
 
+            // Set currentStoryId first (required for addMemory to work)
+            act(() => {
+                result.current.setCurrentStory("story-1");
+            });
+
             await act(async () => {
-                await result.current.addMemory("story-1", "New memory content", "note");
+                await result.current.addMemory("New memory content", "note");
             });
 
             expect(memoryService.addMemory).toHaveBeenCalledWith({
@@ -166,8 +173,13 @@ describe("useMemoryStore", () => {
         it("does nothing when content is empty", async () => {
             const { result } = renderHook(() => useMemoryStore());
 
+            // Set currentStoryId first
+            act(() => {
+                result.current.setCurrentStory("story-1");
+            });
+
             await act(async () => {
-                await result.current.addMemory("story-1", "   ", "note");
+                await result.current.addMemory("   ", "note");
             });
 
             expect(memoryService.addMemory).not.toHaveBeenCalled();
@@ -178,8 +190,13 @@ describe("useMemoryStore", () => {
 
             const { result } = renderHook(() => useMemoryStore());
 
+            // Set currentStoryId first
+            act(() => {
+                result.current.setCurrentStory("story-1");
+            });
+
             await act(async () => {
-                await result.current.addMemory("story-1", "Content", "note");
+                await result.current.addMemory("Content", "note");
             });
 
             expect(result.current.error).toBe("Could not add memory");
@@ -188,7 +205,7 @@ describe("useMemoryStore", () => {
 
     describe("importLorebook", () => {
         it("imports lorebook entries and returns count", async () => {
-            vi.mocked(memoryService.addMemory).mockResolvedValue({ memory_id: "x", story_id: "s" });
+            vi.mocked(memoryService.addMemories).mockResolvedValue({ story_id: "s", count: 2 });
             vi.mocked(memoryService.getContext).mockResolvedValue({ memories: [] });
 
             const { result } = renderHook(() => useMemoryStore());
@@ -201,8 +218,8 @@ describe("useMemoryStore", () => {
             expect(count!).toBe(2);
             expect(result.current.lastImported).toBe(2);
             expect(result.current.importing).toBe(false);
-            // Should have called addMemory for each entry
-            expect(memoryService.addMemory).toHaveBeenCalledTimes(2);
+            // Should have called bulk add once
+            expect(memoryService.addMemories).toHaveBeenCalledTimes(1);
         });
     });
 });

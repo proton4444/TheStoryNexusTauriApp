@@ -14,6 +14,11 @@ describe("useMemoryCompletion", () => {
         vi.clearAllMocks();
     });
 
+    it("requires storyId in options", () => {
+        const { result } = renderHook(() => useMemoryCompletion({ storyId: "story-1" }));
+        expect(result.current.storyId).toBe("story-1");
+    });
+
     it("completes with memory and returns response", async () => {
         const mockResponse = {
             completion: "The hero embarked on a journey...",
@@ -26,19 +31,18 @@ describe("useMemoryCompletion", () => {
         vi.mocked(memoryService.completeWithMemory).mockResolvedValue(mockResponse);
         vi.mocked(memoryService.ingestConversation).mockResolvedValue({});
 
-        const { result } = renderHook(() => useMemoryCompletion());
+        const { result } = renderHook(() => useMemoryCompletion({ storyId: "story-1" }));
 
         let response;
         await act(async () => {
             response = await result.current.completeWithMemory({
-                storyId: "story-1",
                 prompt: "Write about a hero",
             });
         });
 
         expect(response).toEqual(mockResponse);
         expect(memoryService.completeWithMemory).toHaveBeenCalledWith(
-            { storyId: "story-1", prompt: "Write about a hero" },
+            { storyId: "story-1", prompt: "Write about a hero", sessionId: undefined, injectLimit: undefined },
             undefined
         );
     });
@@ -53,11 +57,10 @@ describe("useMemoryCompletion", () => {
         vi.mocked(memoryService.completeWithMemory).mockResolvedValue(mockResponse);
         vi.mocked(memoryService.ingestConversation).mockResolvedValue({});
 
-        const { result } = renderHook(() => useMemoryCompletion({ ingestCompletion: true }));
+        const { result } = renderHook(() => useMemoryCompletion({ storyId: "story-1", ingestCompletion: true }));
 
         await act(async () => {
             await result.current.completeWithMemory({
-                storyId: "story-1",
                 prompt: "Test prompt",
             });
         });
@@ -80,11 +83,10 @@ describe("useMemoryCompletion", () => {
         };
         vi.mocked(memoryService.completeWithMemory).mockResolvedValue(mockResponse);
 
-        const { result } = renderHook(() => useMemoryCompletion({ ingestCompletion: false }));
+        const { result } = renderHook(() => useMemoryCompletion({ storyId: "story-1", ingestCompletion: false }));
 
         await act(async () => {
             await result.current.completeWithMemory({
-                storyId: "story-1",
                 prompt: "Test prompt",
             });
         });
@@ -103,12 +105,11 @@ describe("useMemoryCompletion", () => {
         vi.mocked(memoryService.addMemory).mockResolvedValue({});
 
         const { result } = renderHook(() =>
-            useMemoryCompletion({ ingestPrompt: true, ingestCompletion: false })
+            useMemoryCompletion({ storyId: "story-1", ingestPrompt: true, ingestCompletion: false })
         );
 
         await act(async () => {
             await result.current.completeWithMemory({
-                storyId: "story-1",
                 prompt: "My prompt",
             });
         });
@@ -126,12 +127,11 @@ describe("useMemoryCompletion", () => {
         vi.mocked(memoryService.completeWithMemory).mockRejectedValue(mockError);
 
         const onError = vi.fn();
-        const { result } = renderHook(() => useMemoryCompletion({ onError }));
+        const { result } = renderHook(() => useMemoryCompletion({ storyId: "story-1", onError }));
 
         let response;
         await act(async () => {
             response = await result.current.completeWithMemory({
-                storyId: "story-1",
                 prompt: "Test",
             });
         });

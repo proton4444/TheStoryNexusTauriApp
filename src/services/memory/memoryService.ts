@@ -7,8 +7,9 @@ export type CompletionRequest = {
   prompt: string;
   sessionId?: string;
   injectLimit?: number;
-  injectLimit?: number;
   model?: string;
+  maxTokens?: number;
+  temperature?: number;
   maxContextTokens?: number;
 };
 
@@ -327,6 +328,8 @@ export async function completeWithMemory(req: CompletionRequest, port = DEFAULT_
         session_id: req.sessionId,
         inject_limit: req.injectLimit ?? 3,
         model: req.model,
+        max_tokens: req.maxTokens,
+        temperature: req.temperature,
         max_context_tokens: req.maxContextTokens ?? 2000,
       },
       port,
@@ -341,6 +344,8 @@ export async function completeWithMemory(req: CompletionRequest, port = DEFAULT_
       session_id: req.sessionId,
       inject_limit: req.injectLimit ?? 3,
       model: req.model,
+      max_tokens: req.maxTokens,
+      temperature: req.temperature,
       max_context_tokens: req.maxContextTokens ?? 2000,
     },
     port,

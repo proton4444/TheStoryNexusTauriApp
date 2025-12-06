@@ -3,8 +3,8 @@ mod memory_commands;
 
 use memory_commands::{
     memori_add_memory, memori_completion, memori_config, memori_context, memori_create_session,
-    memori_extract, memori_health, memori_ingest, memori_search, start_memori_sidecar,
-    stop_memori_sidecar, SidecarState,
+    memori_extract, memori_health, memori_ingest, memori_list_memories, memori_search,
+    start_memori_sidecar, stop_memori_sidecar, SidecarState,
 };
 
 #[tauri::command]
@@ -35,6 +35,7 @@ pub fn run() {
             memori_extract,
             memori_ingest,
             memori_search,
+            memori_list_memories,
             memori_context,
             memori_create_session
         ])

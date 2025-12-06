@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Bot, BookOpen } from "lucide-react";
+import { Bot, BookOpen, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function StoryNexus() {
@@ -8,9 +8,11 @@ export default function StoryNexus() {
             <div className="space-y-8 text-center">
                 <h1 className="text-4xl font-bold">The Story Nexus</h1>
 
-                <div className="flex flex-col gap-4 items-center">
-                    <Link to="/stories" className="w-full">
+                <div className="flex flex-col gap-4 items-center" data-testid="home-navigation">
+                    <Link to="/stories" className="w-full" data-testid="nav-stories-link">
                         <Button
+                            id="nav-stories-button"
+                            data-testid="nav-stories-button"
                             variant="outline"
                             className="w-[200px] h-[60px] text-lg"
                         >
@@ -19,8 +21,22 @@ export default function StoryNexus() {
                         </Button>
                     </Link>
 
-                    <Link to="/ai-settings" className="w-full">
+                    <Link to="/memories" className="w-full" data-testid="nav-memories-link">
                         <Button
+                            id="nav-memories-button"
+                            data-testid="nav-memories-button"
+                            variant="outline"
+                            className="w-[200px] h-[60px] text-lg"
+                        >
+                            <Database className="mr-2 h-5 w-5" />
+                            Memories
+                        </Button>
+                    </Link>
+
+                    <Link to="/ai-settings" className="w-full" data-testid="nav-ai-settings-link">
+                        <Button
+                            id="nav-ai-settings-button"
+                            data-testid="nav-ai-settings-button"
                             variant="outline"
                             className="w-[200px] h-[60px] text-lg"
                         >

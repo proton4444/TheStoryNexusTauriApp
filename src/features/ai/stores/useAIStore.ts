@@ -20,6 +20,9 @@ interface AIState {
     isLoading: boolean;
     error: string | null;
     useMemory: boolean;
+    injectLimit: number;
+    lastInjectedContext: string[];
+    lastExtractedEntities: string[];
 
     // Initialize AI service and load settings
     initialize: () => Promise<void>;
@@ -59,6 +62,10 @@ interface AIState {
 
     // New method to abort generation
     abortGeneration: () => void;
+
+    // Toggles & settings
+    setUseMemory: (value: boolean) => void;
+    setInjectLimit: (value: number) => void;
 }
 
 export const useAIStore = create<AIState>((set, get) => ({
@@ -67,6 +74,9 @@ export const useAIStore = create<AIState>((set, get) => ({
     isLoading: false,
     error: null,
     useMemory: false,
+    injectLimit: 3,
+    lastInjectedContext: [],
+    lastExtractedEntities: [],
 
     initialize: async () => {
         set({ isLoading: true, error: null });
@@ -201,10 +211,20 @@ export const useAIStore = create<AIState>((set, get) => ({
         }
 
         try {
-            return await memoriCompletionAdapter(config, storyId);
+            console.log('[useAIStore] Starting memory completion...');
+            const result = await memoriCompletionAdapter(config, storyId, { injectLimit: get().injectLimit });
+            console.log('[useAIStore] Memory completion succeeded:', result ? 'got result' : 'no result');
+            if (result) {
+                set({
+                    lastInjectedContext: result.injected_memories,
+                    lastExtractedEntities: result.extracted_entities || []
+                });
+            }
+            return result;
         } catch (error) {
-            console.error('[useAIStore] Memory completion failed', error);
-            return null;
+            console.error('[useAIStore] Memory completion failed:', error);
+            // Re-throw so the UI can handle the error appropriately
+            throw error;
         }
     },
 
@@ -272,5 +292,8 @@ export const useAIStore = create<AIState>((set, get) => ({
     abortGeneration: () => {
         console.log('[useAIStore] Aborting AI generation');
         aiService.abortStream();
-    }
+    },
+
+    setUseMemory: (value: boolean) => set({ useMemory: value }),
+    setInjectLimit: (value: number) => set({ injectLimit: Math.max(1, Math.min(10, value)) }),
 }));

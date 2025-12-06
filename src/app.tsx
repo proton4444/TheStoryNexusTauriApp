@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Bot, BookOpen, HelpCircle } from "lucide-react";
+import { Bot, BookOpen, HelpCircle, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function App() {
@@ -20,6 +20,17 @@ export default function App() {
 						>
 							<BookOpen className="mr-2 h-5 w-5" />
 							Stories
+						</Button>
+					</Link>
+
+					<Link to="/memories" className="w-full">
+						<Button
+							variant="outline"
+							size="lg"
+							className="w-[200px] h-[60px] text-lg hover:bg-accent hover:text-accent-foreground"
+						>
+							<Database className="mr-2 h-5 w-5" />
+							Memories
 						</Button>
 					</Link>
 

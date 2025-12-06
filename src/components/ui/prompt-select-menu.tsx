@@ -1,12 +1,13 @@
 import { AIModel, Prompt, AllowedModel } from "@/types/story";
 import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarSub, MenubarSubContent, MenubarSubTrigger, MenubarTrigger } from "./menubar";
 import { ChevronDown } from "lucide-react";
+import { useNavigate } from "react-router";
 
 interface PromptSelectMenuProps {
     isLoading: boolean;
     error: string | null;
     prompts: Prompt[];
-    promptType: string;
+    promptType: string | string[];
     selectedPrompt?: Prompt;
     selectedModel?: AllowedModel;
     onSelect: (prompt: Prompt, model: AllowedModel) => void;
@@ -21,7 +22,13 @@ export function PromptSelectMenu({
     selectedModel,
     onSelect
 }: PromptSelectMenuProps) {
-    const filteredPrompts = prompts.filter(p => p.promptType === promptType);
+    const navigate = useNavigate();
+    const filteredPrompts = prompts.filter(p => {
+        if (Array.isArray(promptType)) {
+            return promptType.includes(p.promptType);
+        }
+        return p.promptType === promptType;
+    });
 
     return (
         <Menubar>
@@ -84,7 +91,7 @@ export function PromptSelectMenu({
                                 </MenubarSub>
                             ))}
                             <MenubarSeparator />
-                            <MenubarItem>Configure Prompts...</MenubarItem>
+                            <MenubarItem onClick={() => navigate('/prompts')}>Configure Prompts...</MenubarItem>
                         </>
                     )}
                 </MenubarContent>

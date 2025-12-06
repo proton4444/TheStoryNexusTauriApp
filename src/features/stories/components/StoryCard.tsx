@@ -44,10 +44,14 @@ export function StoryCard({ story, onEdit, onExport }: StoryCardProps) {
     };
 
     return (
-        <Card className="w-full cursor-pointer border-2 border-gray-300 dark:border-gray-700 hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm" onClick={handleCardClick}>
+        <Card
+            className="w-full cursor-pointer border-2 border-gray-300 dark:border-gray-700 hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm"
+            onClick={handleCardClick}
+            data-testid={`story-card-${story.id}`}
+        >
             <CardHeader>
-                <CardTitle>{story.title}</CardTitle>
-                <CardDescription>By {story.author}</CardDescription>
+                <CardTitle data-testid={`story-title-${story.id}`}>{story.title}</CardTitle>
+                <CardDescription>By {story.author || 'Unknown Author'}</CardDescription>
             </CardHeader>
             <CardContent>
                 {story.synopsis && <p className="text-sm text-muted-foreground">{story.synopsis}</p>}

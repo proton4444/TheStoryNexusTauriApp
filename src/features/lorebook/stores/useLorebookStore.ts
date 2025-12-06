@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db } from '@/services/database';
 import type { LorebookEntry } from '@/types/story';
+import { extractFromText } from '@/services/memory/memoryService';
 
 interface LorebookState {
     entries: LorebookEntry[];
@@ -47,6 +48,8 @@ interface LorebookState {
     // Export/Import functions
     exportEntries: (storyId: string) => void;
     importEntries: (jsonData: string, targetStoryId: string) => Promise<void>;
+    autoExtractFromStory: (storyId: string, model?: string) => Promise<number>;
+    importTextEntry: (fileName: string, content: string, targetStoryId: string) => Promise<void>;
 }
 
 export const useLorebookStore = create<LorebookState>((set, get) => ({
@@ -379,4 +382,150 @@ export const useLorebookStore = create<LorebookState>((set, get) => ({
             throw error;
         }
     },
-})); 
+
+    autoExtractFromStory: async (storyId: string, model?: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const chapters = await db.chapters.where('storyId').equals(storyId).sortBy('order');
+            if (!chapters.length) {
+                set({ isLoading: false });
+                return 0;
+            }
+
+            // Concatenate chapter summaries and content; keep it reasonably bounded
+            const combined = chapters
+                .map(ch => {
+                    const summary = ch.summary ? `Summary: ${ch.summary}\n` : '';
+                    let content = ch.content || '';
+
+                    // Attempt to parse Lexical JSON to plain text
+                    try {
+                        if (content.trim().startsWith('{')) {
+                            const json = JSON.parse(content);
+                            if (json.root && json.root.children) {
+                                let extracted = '';
+                                const processNode = (node: any) => {
+                                    if (node.type === 'text') {
+                                        extracted += node.text;
+                                    } else if (node.children && Array.isArray(node.children)) {
+                                        node.children.forEach(processNode);
+                                    }
+
+                                    if (node.type === 'paragraph' || node.type === 'heading') {
+                                        extracted += '\n';
+                                    }
+                                };
+                                json.root.children.forEach(processNode);
+                                content = extracted;
+                            }
+                        }
+                    } catch (e) {
+                        // If parse fails, assume plain text
+                    }
+
+                    return `Chapter ${ch.order}: ${ch.title}\n${summary}${content}`;
+                })
+                .join('\n\n');
+
+            // Trim to ~8000 chars to avoid huge payloads
+            const text = combined.length > 8000 ? combined.slice(0, 8000) : combined;
+
+            console.log("Auto-extract text payload:", text);
+            // Debug toast
+            // import { toast } from "react-toastify"; // This file already imports toast? No, it's a store.
+            // Stores usually don't import toast directly if they want to be pure, but this one does or could?
+            // Actually LorebookPage.tsx calls it.
+            // The store returns `newEntries.length`. 
+            // I'll add a console log here (which I can't read) but maybe return the payload size or something?
+
+            // I'll assume I can't easily toast from here without adding import.
+            // I'll verify if toast is imported.
+
+            const extractResp = await extractFromText({
+                storyId,
+                text,
+                model,
+            });
+
+            const allowedCategories: LorebookEntry['category'][] = [
+                'character',
+                'location',
+                'item',
+                'event',
+                'note',
+                'synopsis',
+                'starting scenario',
+                'timeline',
+            ];
+
+            const existing = get().entries;
+            const dedupeKey = (cat: string, name: string) => `${cat.toLowerCase()}::${name.toLowerCase()}`;
+            const existingKeys = new Set(existing.map(e => dedupeKey(e.category, e.name)));
+
+            const newEntries: LorebookEntry[] = [];
+            for (const mem of extractResp.memories) {
+                const raw = mem.content || '';
+                const [namePart, ...rest] = raw.split(':');
+                const name = namePart.trim() || raw.slice(0, 40);
+                const description = rest.join(':').trim() || raw;
+                const cat = allowedCategories.includes(mem.category as any)
+                    ? (mem.category as LorebookEntry['category'])
+                    : 'note';
+
+                const key = dedupeKey(cat, name);
+                if (existingKeys.has(key)) {
+                    continue;
+                }
+                existingKeys.add(key);
+
+                newEntries.push({
+                    id: crypto.randomUUID(),
+                    storyId,
+                    name,
+                    description,
+                    category: cat,
+                    tags: [],
+                    createdAt: new Date(),
+                    isDisabled: false,
+                });
+            }
+
+            if (newEntries.length) {
+                await db.lorebookEntries.bulkAdd(newEntries);
+                set(state => ({ entries: [...state.entries, ...newEntries], isLoading: false }));
+                get().buildTagMap();
+            } else {
+                set({ isLoading: false });
+            }
+
+            return newEntries.length;
+        } catch (error) {
+            console.error("Auto-extract failed:", error);
+            set({ error: (error as Error).message, isLoading: false });
+            return 0;
+        }
+    },
+
+    importTextEntry: async (fileName: string, content: string, targetStoryId: string) => {
+        try {
+            const baseName = fileName.replace(/\.(txt|md)$/i, "") || "Imported note";
+            const newEntry: LorebookEntry = {
+                id: crypto.randomUUID(),
+                storyId: targetStoryId,
+                name: baseName,
+                description: content,
+                category: "note",
+                tags: [],
+                createdAt: new Date(),
+                isDisabled: false,
+            };
+            await db.lorebookEntries.add(newEntry);
+            set(state => ({ entries: [...state.entries, newEntry] }));
+            get().buildTagMap();
+        } catch (error) {
+            console.error("Plain text import failed:", error);
+            set({ error: (error as Error).message });
+            throw error;
+        }
+    },
+}));

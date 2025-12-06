@@ -195,19 +195,36 @@ pub struct ExtractionResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MemoryResult {
     pub memory_id: String,
+    pub story_id: String,
     pub content: String,
     pub category: Option<String>,
     pub session_id: Option<String>,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResponse {
     pub results: Vec<MemoryResult>,
+    pub total: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ContextResponse {
     pub memories: Vec<MemoryResult>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MemoryListRequest {
+    pub story_id: Option<String>,
+    pub query: Option<String>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MemoryListResponse {
+    pub memories: Vec<MemoryResult>,
+    pub total: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -228,6 +245,8 @@ pub struct CompletionRequest {
     pub inject_limit: Option<u32>,
     pub model: Option<String>,
     pub max_tokens: Option<u32>,
+    pub temperature: Option<f32>,
+    pub max_context_tokens: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -332,6 +351,14 @@ pub async fn memori_context(
     port: Option<u16>,
 ) -> Result<ContextResponse, String> {
     post_json::<ContextResponse, _>("/context", &payload, port).await
+}
+
+#[tauri::command]
+pub async fn memori_list_memories(
+    payload: MemoryListRequest,
+    port: Option<u16>,
+) -> Result<MemoryListResponse, String> {
+    post_json::<MemoryListResponse, _>("/memory/list", &payload, port).await
 }
 
 #[tauri::command]
